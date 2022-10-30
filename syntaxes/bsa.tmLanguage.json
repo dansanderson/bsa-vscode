@@ -1,0 +1,85 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "BSA",
+	"patterns": [
+		{"include": "#keywords"},
+		{"include": "#strings-double"},
+		{"include": "#strings-single"},
+		{"include": "#comments"},
+		{"include": "#star-equals"},
+		{"include": "#comments-star"},
+		{"include": "#numbers"},
+		{"include": "#operators"},
+		{"include": "#pseudoops"},
+		{"include": "#directives"},
+		{"include": "#other-keywords"},
+		{"include": "#opcodes"}
+	],
+	"repository": {
+		"keywords": {
+			"patterns": [{
+				"name": "keyword.control.bsa",
+				"match": "\\b(if|while|for|return)\\b"
+			}]
+		},
+		"strings-double": {
+			"name": "string.quoted.double.bsa",
+			"begin": "\"",
+			"end": "\"",
+			"patterns": [
+				{
+					"name": "constant.character.escape.bsa",
+					"match": "\\\\."
+				}
+			]
+		},
+		"strings-single": {
+			"name": "string.quoted.single.bsa",
+			"begin": "'",
+			"end": "'",
+			"patterns": [
+				{
+					"name": "constant.character.escape.bsa",
+					"match": "\\\\."
+				}
+			]
+		},
+		"comments": {
+			"name": "comment.line.semicolon.bsa",
+			"match": ";.*$"
+		},
+		"star-equals": {
+			"name": "keyword.operator.bsa",
+			"match": "^\\s*\\*\\s*="
+		},
+		"comments-star": {
+			"name": "comment.line.star.bsa",
+			"match": "^\\s*\\*\\s*([^=].*)?$"
+		},
+		"numbers": {
+			"name": "constant.numeric.bsa",
+			"match": "(([0-9]+)|(\\$[0-9a-fA-F]+)|(%[0-1]+))"
+		},
+		"operators": {
+			"name": "keyword.operator.bsa",
+			"match": "(==|!=|>=|<=|<<|>>|&&|\\|\\||=|\\^|<|>|-|!|~|\\+|\\*|/|&|\\||,)"
+		},
+		"opcodes": {
+			"name": "keyword.other.opcode.bsa",
+			"match": "(?i)(?<!\\w)(ADC|ADCQ|AND|ANDQ|ASL|ASLQ|ASR|ASRQ|ASW|AUG|BBR0|BBR1|BBR2|BBR3|BBR4|BBR5|BBR6|BBR7|BBR|BBS0|BBS1|BBS2|BBS3|BBS4|BBS5|BBS6|BBS7|BBS|BCC|BCS|BEQ|BIT|BITQ|BMI|BNE|BPL|BRA|BRK|BRU|BSR|BVC|BVS|CLC|CLD|CLE|CLI|CLV|CMP|CMPQ|CPX|CPY|CPZ|DEA|DEC|DEQ|DEW|DEX|DEY|DEZ|EOM|EOR|EORQ|INA|INC|INQ|INW|INX|INY|INZ|JMP|JSR|LDA|LDQ|LDX|LDY|LDZ|LSR|LSRQ|MAP|MVN|MVP|NEG|NOP|ORA|ORQ|PHA|PHB|PHD|PHK|PHP|PHW|PHX|PHY|PHZ|PLA|PLB|PLD|PLP|PLX|PLY|PLZ|RMB0|RMB1|RMB2|RMB3|RMB4|RMB5|RMB6|RMB7|RMB|ROL|ROLQ|ROR|RORQ|ROW|RTI|RTL|RTS|SBC|SBCQ|SEC|SED|SEE|SEI|SMB0|SMB1|SMB2|SMB3|SMB4|SMB5|SMB6|SMB7|SMB|STA|STP|STQ|STX|STY|STZ|SWA|TAB|TAX|TAY|TAZ|TBA|TCD|TCS|TDC|TRB|TSA|TSB|TSC|TSX|TSY|TXA|TXS|TYA|TYS|TYX|TZA|WAI|WDM|XBA|XCE)(?!\\w)"
+		},
+		"pseudoops": {
+			"name": "keyword.other.pseudoop.bsa",
+			"match": "(?i)(?<!\\w)\\.(WORD|HEX4|DEC4|WOR|BYTE|BYT|PET|SCREEN|BITS|LITS|QUAD|REAL|FILL|BSS|STORE|CPU|BASE|CASE|ORG|LOAD|INCLUDE|SIZE|SKI|PAG|NAM|SUBTTL|END)(?!\\w)"
+		},
+		"directives": {
+			"name": "keyword.other.directive.bsa",
+			"match": "(?i)(?<!\\w)#(if|ifdef|else|endif)(?!\\w)"
+		},
+		"other-keywords": {
+			"name": "keyword.other.bsa",
+			"match": "(?i)(?<!\\w)(macro|endmac|!addr|!src)(?!\\w)"
+		}
+	},
+	"scopeName": "source.bsa"
+}
