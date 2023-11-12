@@ -1,7 +1,7 @@
 {
   "name": "bsa",
-  "displayName": "BSA",
-  "description": "Language support for the BSA assembler",
+  "displayName": "BSA 45GS02 assembler",
+  "description": "Language support for the BSA 6502 / 45GS02 assembler",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.72.0"

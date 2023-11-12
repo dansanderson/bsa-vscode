@@ -2,26 +2,23 @@
 	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
 	"name": "BSA",
 	"patterns": [
-		{"include": "#keywords"},
 		{"include": "#strings-double"},
 		{"include": "#strings-single"},
 		{"include": "#comments"},
 		{"include": "#star-equals"},
+		{"include": "#local-symbols"},
 		{"include": "#comments-star"},
 		{"include": "#numbers"},
 		{"include": "#operators"},
 		{"include": "#pseudoops"},
 		{"include": "#directives"},
 		{"include": "#other-keywords"},
-		{"include": "#opcodes"}
+		{"include": "#opcodes"},
+		{"include": "#addressing-mode-immediate"},
+		{"include": "#addressing-mode"},
+		{"include": "#symbols"}
 	],
 	"repository": {
-		"keywords": {
-			"patterns": [{
-				"name": "keyword.control.bsa",
-				"match": "\\b(if|while|for|return)\\b"
-			}]
-		},
 		"strings-double": {
 			"name": "string.quoted.double.bsa",
 			"begin": "\"",
@@ -56,17 +53,29 @@
 			"name": "comment.line.star.bsa",
 			"match": "^\\s*\\*\\s*([^=].*)?$"
 		},
+		"local-symbols": {
+			"name": "entity.name.tag.bsa",
+			"match": "(?<!\\w)[0-9]+\\$(?!\\w)"
+		},
 		"numbers": {
 			"name": "constant.numeric.bsa",
-			"match": "(([0-9]+)|(\\$[0-9a-fA-F]+)|(%[0-1]+))"
+			"match": "((\\d+)|(\\$\\h+)|(%[0-1]+))"
 		},
 		"operators": {
 			"name": "keyword.operator.bsa",
-			"match": "(==|!=|>=|<=|<<|>>|&&|\\|\\||=|\\^|<|>|-|!|~|\\+|\\*|/|&|\\||,)"
+			"match": "(==|!=|>=|<=|<<|>>|&&|\\|\\||=|\\^|<|>|-|!|~|\\+|\\*|/|&|\\||\\(|\\)|\\[|\\])"
 		},
 		"opcodes": {
 			"name": "keyword.other.opcode.bsa",
-			"match": "(?i)(?<!\\w)(ADC|ADCQ|AND|ANDQ|ASL|ASLQ|ASR|ASRQ|ASW|AUG|BBR0|BBR1|BBR2|BBR3|BBR4|BBR5|BBR6|BBR7|BBR|BBS0|BBS1|BBS2|BBS3|BBS4|BBS5|BBS6|BBS7|BBS|BCC|BCS|BEQ|BIT|BITQ|BMI|BNE|BPL|BRA|BRK|BRU|BSR|BVC|BVS|CLC|CLD|CLE|CLI|CLV|CMP|CMPQ|CPX|CPY|CPZ|DEA|DEC|DEQ|DEW|DEX|DEY|DEZ|EOM|EOR|EORQ|INA|INC|INQ|INW|INX|INY|INZ|JMP|JSR|LDA|LDQ|LDX|LDY|LDZ|LSR|LSRQ|MAP|MVN|MVP|NEG|NOP|ORA|ORQ|PHA|PHB|PHD|PHK|PHP|PHW|PHX|PHY|PHZ|PLA|PLB|PLD|PLP|PLX|PLY|PLZ|RMB0|RMB1|RMB2|RMB3|RMB4|RMB5|RMB6|RMB7|RMB|ROL|ROLQ|ROR|RORQ|ROW|RTI|RTL|RTS|SBC|SBCQ|SEC|SED|SEE|SEI|SMB0|SMB1|SMB2|SMB3|SMB4|SMB5|SMB6|SMB7|SMB|STA|STP|STQ|STX|STY|STZ|SWA|TAB|TAX|TAY|TAZ|TBA|TCD|TCS|TDC|TRB|TSA|TSB|TSC|TSX|TSY|TXA|TXS|TYA|TYS|TYX|TZA|WAI|WDM|XBA|XCE)(?!\\w)"
+			"match": "(?i)(?<!\\w)(ASL\\s+A|ASLQ\\s+Q|ASR\\s+A|ASRQ\\s+Q|DEC\\s+A|INC\\s+A|INQ\\s+Q|LSR\\s+A|LSRQ\\s+Q|NEG\\s+A|ROL\\s+A|ROLQ\\s+Q|ROR\\s+A|RORQ\\s+Q|ADC|ADCQ|AND|ANDQ|ASL|ASLQ|ASR|ASRQ|ASW|AUG|BBR0|BBR1|BBR2|BBR3|BBR4|BBR5|BBR6|BBR7|BBR|BBS0|BBS1|BBS2|BBS3|BBS4|BBS5|BBS6|BBS7|BBS|BCC|BCS|BEQ|BIT|BITQ|BMI|BNE|BPL|BRA|BRK|BRU|BSR|BVC|BVS|CLC|CLD|CLE|CLI|CLV|CMP|CMPQ|CPX|CPY|CPZ|DEA|DEC|DEQ|DEW|DEX|DEY|DEZ|EOM|EOR|EORQ|INA|INC|INQ|INW|INX|INY|INZ|JMP|JSR|LDA|LDQ|LDX|LDY|LDZ|LSR|LSRQ|MAP|MVN|MVP|NEG|NOP|ORA|ORQ|PHA|PHB|PHD|PHK|PHP|PHW|PHX|PHY|PHZ|PLA|PLB|PLD|PLP|PLX|PLY|PLZ|RMB0|RMB1|RMB2|RMB3|RMB4|RMB5|RMB6|RMB7|RMB|ROL|ROLQ|ROR|RORQ|ROW|RTI|RTL|RTS|SBC|SBCQ|SEC|SED|SEE|SEI|SMB0|SMB1|SMB2|SMB3|SMB4|SMB5|SMB6|SMB7|SMB|STA|STP|STQ|STX|STY|STZ|SWA|TAB|TAX|TAY|TAZ|TBA|TCD|TCS|TDC|TRB|TSA|TSB|TSC|TSX|TSY|TXA|TXS|TYA|TYS|TYX|TZA|WAI|WDM|XBA|XCE)(?!\\w)"
+		},
+		"addressing-mode-immediate": {
+			"name": "keyword.other.opcode-addressing-immediate.bsa",
+			"match": "#"
+		},
+		"addressing-mode": {
+			"name": "keyword.other.opcode-addressing.bsa",
+			"match": "(?i)(,\\s*x\\b|,\\s*y\\b|,\\s*z\\b)"
 		},
 		"pseudoops": {
 			"name": "keyword.other.pseudoop.bsa",
@@ -79,6 +88,10 @@
 		"other-keywords": {
 			"name": "keyword.other.bsa",
 			"match": "(?i)(?<!\\w)(macro|endmac|!addr|!src)(?!\\w)"
+		},
+		"symbols": {
+			"name": "entity.name.function.bsa",
+			"match": "\\b[\\p{Alpha}_]\\w+\\b"
 		}
 	},
 	"scopeName": "source.bsa"
