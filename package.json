@@ -1,25 +1,65 @@
 {
   "name": "bsa",
   "displayName": "BSA 45GS02 assembler",
-  "description": "Language support for the BSA 6502 / 45GS02 assembler",
   "version": "0.0.1",
-  "engines": {
-    "vscode": "^1.72.0"
+  "description": "Language support for the BSA 6502 / 45GS02 assembler",
+  "author": "Dan Sanderson",
+  "license": "GPL 3",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dansanderson/bsa-vscode"
   },
+  "keywords": [
+    "6502",
+    "45gs02",
+    "mega65",
+    "bsa"
+  ],
   "categories": [
     "Programming Languages"
   ],
+  "engines": {
+    "vscode": "^1.75.0"
+  },
   "contributes": {
-    "languages": [{
-      "id": "bsa",
-      "aliases": ["BSA", "bsa"],
-      "extensions": [".src",".asm"],
-      "configuration": "./language-configuration.json"
-    }],
-    "grammars": [{
-      "language": "bsa",
-      "scopeName": "source.bsa",
-      "path": "./syntaxes/bsa.tmLanguage.json"
-    }]
+    "languages": [
+      {
+        "id": "bsa",
+        "aliases": [
+          "BSA",
+          "bsa"
+        ],
+        "extensions": [
+          ".src",
+          ".asm"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "bsa",
+        "scopeName": "source.bsa",
+        "path": "./syntaxes/bsa.tmLanguage.json"
+      }
+    ]
+  },
+  "main": "./client/out/extension",
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -b",
+    "watch": "tsc -b -w",
+    "lint": "eslint ./client/src ./server/src --ext .ts,.tsx",
+    "postinstall": "cd client && npm install && cd ../server && npm install && cd ..",
+    "test": "sh ./scripts/e2e.sh"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.4",
+    "@types/node": "^20.9.0",
+    "@typescript-eslint/eslint-plugin": "^6.10.0",
+    "@typescript-eslint/parser": "^6.10.0",
+    "eslint": "^8.53.0",
+    "mocha": "^10.2.0",
+    "typescript": "^5.2.2"
   }
 }

@@ -1,0 +1,21 @@
+{
+	"name": "bsa-client",
+	"description": "VSCode client for BSA language server",
+	"author": "Dan Sanderson",
+	"license": "GPL 3",
+	"version": "0.0.1",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/dansanderson/bsa-vscode"
+	},
+	"engines": {
+		"vscode": "^1.75.0"
+	},
+	"dependencies": {
+		"vscode-languageclient": "^9.0.1"
+	},
+	"devDependencies": {
+		"@types/vscode": "^1.84.1",
+		"@vscode/test-electron": "^2.3.6"
+	}
+}

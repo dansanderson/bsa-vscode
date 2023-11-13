@@ -12,10 +12,14 @@ Implemented features:
 
 Intended features:
 
-* Jump to definition
-* Hover display of assembler-generated addresses and values
-* Error checking
-* Folding
+* Highlight errors and warnings
+* Find all references
+* Go to definition
+* List document symbols
+
+## Installing the extension
+
+TODO
 
 ## Customizing syntax coloring
 
@@ -44,18 +48,23 @@ For example, to set the immediate mode `#` to pink and local labels (`10$`) to c
 
 For a complete list of scopes, see `./syntaxes/bsa.tmLanguage.json`.
 
-## Requirements
+## Developing the extension
 
-TODO
+This extension, including the language server, is written entirely in TypeScript. To set up development, it should be sufficient to run `npm install` in the root folder, in `client/`, and in `server/`.
 
-Acquire and build the [BSA assembler](https://github.com/Edilbert/BSA). Set the
-`bsaPath` configuration property.
+To start a debugging session:
 
-## Extension Settings
+1. Open the root folder in VS Code.
+2. Press Ctrl+Shift+B (Cmd+Shift+B on Mac) to start compiling the client and server in watch mode.
+3. Select the Run and Debug view from the side panel (or press Ctrl+Shift+D, Cmd+Shift+D on Mac).
+4. Select the "Client + Server" compound debugging configuration from the dropdown menu, then press F5 to launch it. The main window starts debugging mode with a debugging toolbar shown, and another window opens running the extension.
+5. In the main window's debugging toolbar, switch between "Launch Client" and "Activate Server" to debug the client or server, respectively. This switches the Debug Console, and allows for setting breakpoints on the respective TypeScript code files.
 
-TODO
+To enable logging of all client-server messages, add this to `.vscode/settings.json`: `"bsa.trace.server": "verbose"`
 
-* `bsaPath`
+To run server-side unit tests: (TODO)
+
+To run end-to-end tests: (TODO) (See [Testing the Language Server](https://code.visualstudio.com/api/language-extensions/language-server-extension-guide#testing-the-language-server). See also [vscode-extension-samples](https://github.com/microsoft/vscode-extension-samples/).)
 
 ## Known Issues
 
