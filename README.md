@@ -50,7 +50,11 @@ For a complete list of scopes, see `./syntaxes/bsa.tmLanguage.json`.
 
 ## Developing the extension
 
+### Installing packages
+
 This extension, including the language server, is written entirely in TypeScript. To set up development, it should be sufficient to run `npm install` in the root folder, in `client/`, and in `server/`.
+
+### Starting a debugging session
 
 To start a debugging session:
 
@@ -62,9 +66,24 @@ To start a debugging session:
 
 To enable logging of all client-server messages, add this to `.vscode/settings.json`: `"bsa.trace.server": "verbose"`
 
-To run server-side unit tests: (TODO)
+### Language server unit tests
 
-To run end-to-end tests: (TODO) (See [Testing the Language Server](https://code.visualstudio.com/api/language-extensions/language-server-extension-guide#testing-the-language-server). See also [vscode-extension-samples](https://github.com/microsoft/vscode-extension-samples/).)
+The language server uses [Jest](https://jestjs.io/) for unit tests, with TypeScript support.
+
+Tests are located in `server/tests/`. Example:
+
+```ts
+import { parseBsa } from '../src/bsa';
+
+describe('parseBsa', () => {
+	test('empty string returns empty results', () => {
+		const results = parseBsa('');
+		expect(results.diagnostics.length).toBe(0);
+	});
+});
+```
+
+To run language server unit tests: `cd server; npm run test`
 
 ## Known Issues
 
