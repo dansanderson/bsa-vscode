@@ -1,8 +1,6 @@
 import {
 	createConnection,
 	TextDocuments,
-	Diagnostic,
-	DiagnosticSeverity,
 	ProposedFeatures,
 	InitializeParams,
 	TextDocumentSyncKind,
@@ -12,6 +10,14 @@ import {
 import {
 	TextDocument
 } from 'vscode-languageserver-textdocument';
+
+import {
+	ParseResults
+} from './parse';
+
+import {
+	parseBsa
+} from './bsa';
 
 const connection = createConnection(ProposedFeatures.all);
 
@@ -71,40 +77,14 @@ documents.onDidChangeContent(change => {
 });
 
 async function validateTextDocument(textDocument: TextDocument): Promise<void> {
+	const parseResults: ParseResults = parseBsa(textDocument.getText());
 
-	const diagnostics: Diagnostic[] = [];
+	// TODO: cache parseResults for textDocument.uri
 
-	console.log('server output: validateTextDocument');
-	connection.console.log('client output: validateTextDocument');
-
-	const text = textDocument.getText();
-	const pattern = /\bTODO\b/g;
-	let m: RegExpExecArray | null;
-	while ((m = pattern.exec(text))) {
-		const diagnostic: Diagnostic = {
-			severity: DiagnosticSeverity.Information,
-			range: {
-				start: textDocument.positionAt(m.index),
-				end: textDocument.positionAt(m.index + m[0].length)
-			},
-			message: `Be sure to do this!`,
-			source: 'ex'
-		};
-		if (hasDiagnosticRelatedInformationCapability) {
-			diagnostic.relatedInformation = [
-				{
-					location: {
-						uri: textDocument.uri,
-						range: Object.assign({}, diagnostic.range)
-					},
-					message: 'Remove "TODO" when this is done'
-				}
-			];
-		}
-		diagnostics.push(diagnostic);
-	}
-
-	connection.sendDiagnostics({ uri: textDocument.uri, diagnostics });
+	connection.sendDiagnostics({
+		uri: textDocument.uri,
+		diagnostics: parseResults.diagnostics
+	});
 }
 
 // Go To Definition
