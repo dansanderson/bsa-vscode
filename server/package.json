@@ -15,7 +15,8 @@
 		"test": "tests"
 	},
 	"scripts": {
-		"test": "jest"
+		"test": "jest",
+		"test:debug": "jest --runInBand"
 	},
 	"dependencies": {
 		"vscode-languageserver": "^9.0.1",

@@ -13,6 +13,10 @@ interface NumberedLine {
 	number: number
 }
 
+function escapeForRegExp(s: string) {
+    return s.replace(/[/\-\\^$*+?.()|[\]{}]/g, '\\$&');
+}
+
 function expectPat(pat: RegExp, line: string, pos: number) {
 	const m = pat.exec(line.substring(pos));
 	if (m) {
@@ -21,12 +25,12 @@ function expectPat(pat: RegExp, line: string, pos: number) {
 	return null;
 }
 
-const emptyOrCommentPat = new RegExp('\\s*(;.*)?$');
+const emptyOrCommentPat = new RegExp('^\\s*(;.*)?$');
 function expectEmptyOrComment(line: string, pos: number): number | null {
 	return expectPat(emptyOrCommentPat, line, pos);
 }
 
-const namePat = new RegExp('\\p{Letter}[\\w\\.]*', 'iu');
+const namePat = new RegExp('^\\p{Letter}[\\w\\.]*', 'iu');
 function expectName(line: string, pos: number): number | null {
 	return expectPat(namePat, line, pos);
 }
@@ -42,7 +46,7 @@ function makeLineError(numLine: NumberedLine, start: number, end: number, messag
 	};
 }
 
-function parseLine(numLine: NumberedLine): ParseResults {
+export function parseLine(numLine: NumberedLine): ParseResults {
 	const results: ParseResults = {
 		diagnostics: []
 	};
@@ -64,18 +68,20 @@ function parseLine(numLine: NumberedLine): ParseResults {
 		}
 	}
 
+	// TODO: Does BSA support #... not in the first column? With comment after?
+
 	// Items that must appear alone on the line
-	['#else', '#endif', 'endmac'].forEach(term => {
-		const pat = new RegExp('^' + term + '\\b', 'i');
+	for (const term of ['#else', '#endif', 'endmac']) {
+		const pat = new RegExp('^' + escapeForRegExp(term) + '\\b', 'i');
 		if (pat.test(trimmed)) {
 			if (expectEmptyOrComment(trimmed, term.length) == null) {
 				results.diagnostics.push(makeLineError(
 					numLine, charIndex, charIndex + term.length,
-					pat + ' must appear alone on the line'));
+					term + ' must appear alone on the line'));
 			}
 			return results;
 		}
-	});
+	}
 
 	// Conditional assembly directives
 	if (/^#if\b/i.test(trimmed)) {
@@ -87,11 +93,11 @@ function parseLine(numLine: NumberedLine): ParseResults {
 		const e = expectName(numLine.line, charIndex + 7);
 		if (e == null) {
 			results.diagnostics.push(makeLineError(
-				numLine, charIndex, charIndex + 7,
+				numLine, charIndex, charIndex + 6,
 				'Missing symbol for #ifdef'));
 		} else if (expectEmptyOrComment(numLine.line, e) == null) {
 			results.diagnostics.push(makeLineError(
-				numLine, charIndex, e,
+				numLine, e, e,
 				'Unexpected characters after #ifdef'));
 		}
 		return results;
@@ -122,6 +128,7 @@ function parseLine(numLine: NumberedLine): ParseResults {
 	// [{sym}:?] {pseudo-opcode} {args}
 	// [{sym}:?] {opcode} {addr-expr}
 	// [{sym}:?]
+	// same for local labels (\d+\$)
 
 	return results;
 }
