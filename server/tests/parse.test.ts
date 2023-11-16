@@ -1,3 +1,5 @@
+import { expect } from '@jest/globals';
+
 import { parseBsa } from '../src/bsa';
 
 describe('parseBsa', () => {

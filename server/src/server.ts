@@ -4,7 +4,12 @@ import {
 	ProposedFeatures,
 	InitializeParams,
 	TextDocumentSyncKind,
-	InitializeResult
+	InitializeResult,
+	DefinitionParams,
+	ReferenceParams,
+	DocumentSymbolParams,
+	SymbolKind,
+	DocumentHighlightParams
 } from 'vscode-languageserver/node';
 
 import {
@@ -26,6 +31,8 @@ const documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
 let hasConfigurationCapability = false;
 let hasWorkspaceFolderCapability = false;
 let hasDiagnosticRelatedInformationCapability = false;
+
+const documentParseResults: Map<string, ParseResults> = new Map();
 
 connection.onInitialize((params: InitializeParams) => {
 
@@ -72,6 +79,10 @@ connection.onInitialized(() => {
 	}
 });
 
+documents.onDidClose(e => {
+	documentParseResults.delete(e.document.uri);
+});
+
 documents.onDidChangeContent(change => {
 	validateTextDocument(change.document);
 });
@@ -79,7 +90,7 @@ documents.onDidChangeContent(change => {
 async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 	const parseResults: ParseResults = parseBsa(textDocument.getText());
 
-	// TODO: cache parseResults for textDocument.uri
+	documentParseResults.set(textDocument.uri, parseResults);
 
 	connection.sendDiagnostics({
 		uri: textDocument.uri,
@@ -87,14 +98,75 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 	});
 }
 
-// Go To Definition
-// connection.onDefinition()
-// Find All References
-// connection.onReferences()
-// List Document Symbols
-// connection.onDocumentSymbol()
-// Highlight All Occurrences
-// connection.onDocumentHighlight()
+// TODO: Go To Definition
+connection.onDefinition((request: DefinitionParams) => {
+	// request.textDocument.uri
+	// request.position.character
+	// request.position.line
+
+	// return null;
+	return {
+		uri: request.textDocument.uri,
+		range: {
+			start: { line: 0, character: 0 },
+			end: { line: 0, character: 1 }
+		}
+	};
+});
+
+// TODO: Find All References
+connection.onReferences((request: ReferenceParams) => {
+	// request.textDocument.uri
+	// request.position.character
+	// request.position.line
+	// request.context.includeDeclaration
+
+	// return null;
+	return [
+		{
+			uri: request.textDocument.uri,
+			range: {
+				start: { line: 0, character: 0 },
+				end: { line: 0, character: 1 }
+			}
+		}
+	];
+});
+
+// TODO: List Document Symbols
+connection.onDocumentSymbol((request: DocumentSymbolParams) => {
+	// request.textDocument.uri
+	return [
+		{
+			name: 'symName',
+			kind: SymbolKind.Variable,
+			range: {
+				start: { line: 0, character: 0 },
+				end: { line: 0, character: 1 }
+			},
+			selectionRange: {
+				start: { line: 0, character: 0 },
+				end: { line: 0, character: 1 }
+			}
+		}
+	];
+});
+
+// TODO: Highlight All Occurrences
+connection.onDocumentHighlight((request: DocumentHighlightParams) => {
+	// request.textDocument.uri
+	// request.position.character
+	// request.position.line
+
+	return [
+		{
+			range: {
+				start: { line: 0, character: 0 },
+				end: { line: 0, character: 1 }
+			}
+		}
+	];
+});
 
 documents.listen(connection);
 
