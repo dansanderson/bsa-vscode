@@ -1,53 +1,94 @@
 import {
 	Diagnostic,
+	DiagnosticSeverity
 } from 'vscode-languageserver/node';
 
 import { lexLine, Token, TokenType } from './bsa_lex';
 
-export interface ParseResults {
-	diagnostics: Diagnostic[];
+export class Parser {
+	diagnostics: Diagnostic[] = [];
+	symbolDefinitions: Token[] = [];
+	symbolUses: Map<string, Array<Token>> = new Map();
+	macroDefinitions: Token[] = [];
+	macroUses: Map<string, Array<Token>> = new Map();
+
+	addDiagnosticForTokenRange(message: string, severity: DiagnosticSeverity, startToken: Token, endToken: Token) {
+		this.diagnostics.push({
+			severity: severity,
+			range: {
+				start: { line: startToken.lineNumber, character: startToken.start },
+				end: { line: endToken.lineNumber, character: endToken.end },
+			},
+			message: message
+		});
+	}
+
+	addDiagnosticForToken(message: string, severity: DiagnosticSeverity, token: Token) {
+		this.addDiagnosticForTokenRange(message, severity, token, token);
+	}
+
+	parseLine(text: string, lineNumber: number) {
+		const lexResults = lexLine(text, lineNumber);
+		this.diagnostics.concat(lexResults.diagnostics);
+
+		if (lexResults.tokens.length == 0) return;
+
+		// Keywords that must appear alone on the line
+		for (const kw of ['#else', '#endif', 'endmac']) {
+			if (lexResults.tokens[0].type === TokenType.Keyword &&
+					lexResults.tokens[0].normText === kw) {
+				if (lexResults.tokens.length > 1) {
+					this.addDiagnosticForToken(
+						'Unexpected text after ' + lexResults.tokens[0].normText,
+						DiagnosticSeverity.Error, lexResults.tokens[0]);
+				}
+			} else if (lexResults.tokens.length > 1) {
+				for (let i = 1; i < lexResults.tokens.length; i++) {
+					if (lexResults.tokens[i].normText === kw) {
+						this.addDiagnosticForToken(
+							'Unexpected text before ' + lexResults.tokens[i].normText,
+							DiagnosticSeverity.Error, lexResults.tokens[i]);
+					}
+				}
+			}
+		}
+
+		// TODO:
+		// - #if {expr}
+		// - #ifdef {sym}
+		// - Unrecognized #... directive
+		// - macro {sym}([arglist])
+		//   - record macro definition
+		// - Assignment
+		//    * = {expr}
+		//    & = {expr}
+		//    {sym} = {expr}
+		// - [{sym}:?] {macro-name} '(' [{expr} [',' {expr}...]] ')'
+		//   - record macro use
+		// - [{sym}:?] {pseudo-opcode} {args}
+		// - [{sym}:?] {opcode} {addr-expr}
+		// - [{sym}:?]
+		//   - record label; ignore local labels (\d+\$)
+		//
+		// - expr parsing
+		//   - record symbol use
+		// - addressing mode parsing
+		//   '#' {expr}
+		//   {expr}
+		//   {expr} ',' [xyz]
+		//   '(' {expr} ')' ',' [xyz]
+		//   '(' {expr} ',' [xy] ')'
+		//   '(' {expr} ')'
+		//   '[' {expr} ']' ',z'
+		//   '[' {expr} ']'
+	}
 }
 
-export function mergeResults(first: ParseResults, second: ParseResults): ParseResults {
-	return {
-		diagnostics: first.diagnostics.concat(second.diagnostics)
-	};
-}
-
-export function parseLine(text: string, lineNumber: number): ParseResults {
-	const results: ParseResults = {
-		diagnostics: []
-	};
-
-	const lexResults = lexLine(text, lineNumber);
-	results.diagnostics.concat(lexResults.diagnostics);
-
-	// TODO: parse lexResults.tokens, accrue parser diagnostics
-	// - Keywords that must appear alone on the line: ['#else', '#endif', 'endmac']
-	// - #if {expr}
-	// - #ifdef {sym}
-	// - Unrecognized #... directive
-	// - macro {sym}([arglist])
-	//   - record macro definition
-	// - Assignment
-	//    * = {expr}
-	//    & = {expr}
-	//    {sym} = {expr}
-	// - [{sym}:?] {pseudo-opcode} {args}
-	// - [{sym}:?] {opcode} {addr-expr}
-	// - [{sym}:?]
-	//   - record label; ignore local labels (\d+\$)
-
-	return results;
-}
-
-export function parseBsa(s: string): ParseResults {
+export function parseBsa(bodyText: string): Parser {
+	const par = new Parser();
 	let lineNum = 0;
-	const results = s.split('\n')
-		.map((line) => parseLine(line, lineNum++))
-		.reduce(mergeResults);
-
-	return results;
+	bodyText.split('\n').forEach((line) => par.parseLine(line, lineNum++));
+	return par;
 }
 
 // Symbol equal definition   ^\s*{sym}\s*=\s*{expr}

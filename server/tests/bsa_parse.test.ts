@@ -1,21 +1,24 @@
 import { expect } from '@jest/globals';
 
-import { parseLine, parseBsa } from '../src/bsa_parse';
+import { Parser, parseBsa } from '../src/bsa_parse';
 
 describe('parseLine: empty and comments', () => {
 	test('empty string returns empty results', () => {
-		const results = parseLine('', 0);
-		expect(results.diagnostics.length).toBe(0);
+		const par = new Parser();
+		par.parseLine('', 0);
+		expect(par.diagnostics.length).toBe(0);
 	});
 
 	test('star comment only returns empty results', () => {
-		const results = parseLine('  * star comment', 0);
-		expect(results.diagnostics.length).toBe(0);
+		const par = new Parser();
+		par.parseLine('  * star comment', 0);
+		expect(par.diagnostics.length).toBe(0);
 	});
 
 	test('semicolon comment only returns empty results', () => {
-		const results = parseLine('   ; line comment', 0);
-		expect(results.diagnostics.length).toBe(0);
+		const par = new Parser();
+		par.parseLine('   ; line comment', 0);
+		expect(par.diagnostics.length).toBe(0);
 	});
 });
 

@@ -292,7 +292,7 @@ describe('Lexer lexOperator', () => {
 		expect(lex.isActive()).toBe(false);
 		expect(lex.isDone()).toBe(false);
 		expect(lex.tokens.length).toBe(1);
-		expect(lex.tokens[0].type).toBe(TokenType.Keyword);
+		expect(lex.tokens[0].type).toBe(TokenType.Operator);
 		expect(lex.tokens[0].normText).toEqual('>>');
 		expect(lex.tokens[0].start).toBe(1);
 		expect(lex.tokens[0].end).toBe(3);
@@ -304,7 +304,7 @@ describe('Lexer lexOperator', () => {
 		expect(lex.isActive()).toBe(false);
 		expect(lex.isDone()).toBe(false);
 		expect(lex.tokens.length).toBe(1);
-		expect(lex.tokens[0].type).toBe(TokenType.Keyword);
+		expect(lex.tokens[0].type).toBe(TokenType.Operator);
 		expect(lex.tokens[0].normText).toEqual('>');
 		expect(lex.tokens[0].start).toBe(1);
 		expect(lex.tokens[0].end).toBe(2);
@@ -327,6 +327,7 @@ describe('Lexer lexName', () => {
 		expect(lex.tokens[0].type).toBe(TokenType.Name);
 		expect(lex.tokens[0].start).toBe(1);
 		expect(lex.tokens[0].end).toBe(2);
+		expect(lex.tokens[0].normText).toEqual('*');
 	});
 
 	test('matches ampersand', () => {
@@ -338,6 +339,7 @@ describe('Lexer lexName', () => {
 		expect(lex.tokens[0].type).toBe(TokenType.Name);
 		expect(lex.tokens[0].start).toBe(1);
 		expect(lex.tokens[0].end).toBe(2);
+		expect(lex.tokens[0].normText).toEqual('&');
 	});
 
 	test('matches label', () => {
@@ -349,6 +351,7 @@ describe('Lexer lexName', () => {
 		expect(lex.tokens[0].type).toBe(TokenType.Name);
 		expect(lex.tokens[0].start).toBe(1);
 		expect(lex.tokens[0].end).toBe(5);
+		expect(lex.tokens[0].normText).toEqual('loop');
 	});
 
 	test('matches label with numbers and dots', () => {
@@ -360,6 +363,7 @@ describe('Lexer lexName', () => {
 		expect(lex.tokens[0].type).toBe(TokenType.Name);
 		expect(lex.tokens[0].start).toBe(1);
 		expect(lex.tokens[0].end).toBe(7);
+		expect(lex.tokens[0].normText).toEqual('L12.34');
 	});
 
 	test('matches local label', () => {
@@ -371,6 +375,7 @@ describe('Lexer lexName', () => {
 		expect(lex.tokens[0].type).toBe(TokenType.Name);
 		expect(lex.tokens[0].start).toBe(1);
 		expect(lex.tokens[0].end).toBe(4);
+		expect(lex.tokens[0].normText).toEqual('10$');
 	});
 
 	test('does not match non-name', () => {

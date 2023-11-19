@@ -29,6 +29,46 @@ const keywordPatterns: Array<KeywordPattern> = keywords.map((kw) => {
 	};
 });
 
+const opcodes = [
+	'adc', 'adcq', 'and', 'andq', 'asl', 'aslq', 'asr', 'asrq', 'asw',
+	'bbr0', 'bbr1', 'bbr2', 'bbr3', 'bbr4', 'bbr5', 'bbr6', 'bbr7',
+	'bbs0', 'bbs1', 'bbs2', 'bbs3', 'bbs4', 'bbs5', 'bbs6', 'bbs7',
+	'bcc', 'bcs', 'beq', 'bmi', 'bne', 'bpl', 'bvc', 'bvs', 'bit',
+	'bitq', 'bra', 'brk', 'bsr', 'clc', 'cld', 'cle', 'cli', 'clv',
+	'cmp', 'cmpq', 'cpx', 'cpy', 'cpz', 'dec', 'deq', 'dew',
+	'dex', 'dey', 'dez', 'eom', 'eor', 'eorq', 'inc',
+	'inq', 'inw', 'inx', 'iny', 'inz', 'jmp', 'jsr', 'lda',
+	'ldq', 'ldx', 'ldy', 'ldz', 'lsr', 'lsrq', 'map',
+	'neg', 'ora', 'orq', 'pha', 'pla', 'phx', 'plx', 'phy', 'ply',
+	'phz', 'plz', 'php', 'phw', 'plp',
+	'rmb0', 'rmb1', 'rmb2', 'rmb3', 'rmb4', 'rmb5', 'rmb6', 'rmb7',
+	'rol', 'ror', 'rolq', 'rorq', 'row', 'rti', 'rts', 'sbc',
+	'sbcq', 'sec', 'sed', 'see', 'sei',
+	'smb0', 'smb1', 'smb2', 'smb3', 'smb4', 'smb5', 'smb6', 'smb7',
+	'sta', 'stq', 'stx', 'sty', 'stz', 'tab', 'tax', 'txa',
+	'tay', 'tya', 'taz', 'tza', 'tba', 'tsx', 'tsy', 'trb', 'tsb',
+	'txs', 'tys',
+
+	'nop', // = 'eom'
+	'aug', // = 'map'
+	'bru', // = 'bra'
+	'ina', // = 'inc a'
+	'dea', // = 'dec a'
+
+	// 65802 and 65816 instructions supported by BSA
+	'phd', 'tcs', 'pld', 'tsa', 'tsc', 'wdm', 'mvp', 'phk', 'mvn',
+    'tcd', 'rtl', 'tdc', 'phb', 'plb', 'tyx', 'wai', 'stp', 'swa',
+    'xba', 'xce'
+];
+
+const opcodePatterns: Array<KeywordPattern> = opcodes.map((kw) => {
+	return {
+		keyword: kw,
+		pat: RegExp(escapeForRegExp(kw) + '\\b', 'iy')
+	};
+});
+
+
 // Operator tokens, in longest-to-shortest match order
 const operators = [
 	'==', '!=', '>=', '<=', '>>', '<<', '&&', '||',
@@ -53,6 +93,8 @@ export enum TokenType {
 	LiteralNumber,
 	Name,
 	Keyword,
+	Operator,
+	Opcode,
 	RestOfLine
 }
 
@@ -196,7 +238,18 @@ export class Lexer {
 		if (!this.isActive()) return this;
 		for (const operatorPat of operatorPatterns) {
 			if (this.match(operatorPat.pat)) {
-				this.addToken(TokenType.Keyword, operatorPat.keyword);
+				this.addToken(TokenType.Operator, operatorPat.keyword);
+				break;
+			}
+		}
+		return this;
+	}
+
+	lexOpcode(): Lexer {
+		if (!this.isActive()) return this;
+		for (const opcodePat of opcodePatterns) {
+			if (this.match(opcodePat.pat)) {
+				this.addToken(TokenType.Opcode, opcodePat.keyword);
 				break;
 			}
 		}
@@ -206,7 +259,7 @@ export class Lexer {
 	lexName(): Lexer {
 		if (!this.isActive()) return this;
 		if (this.match(namePattern)) {
-			this.addToken(TokenType.Name);
+			this.addToken(TokenType.Name, this.text.substring(this.start, this.end));
 		}
 		return this;
 	}
@@ -228,10 +281,11 @@ export function lexLine(text: string, lineNumber: number): Lexer {
 		results.startLex()
 			.lexLineComment()
 			.lexStringLiteral()
+			.lexOpcode()
 			.lexKeyword()
-			.lexName()
 			.lexNumber()
-			.lexOperator();
+			.lexOperator()
+			.lexName();
 		if (results.isActive()) {
 			results.addError('Syntax error');
 			break;
