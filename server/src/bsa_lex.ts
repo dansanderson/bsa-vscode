@@ -45,15 +45,15 @@ const operatorPatterns: Array<KeywordPattern> = operators.map((kw) => {
 
 const spacePattern = /\s*/y;
 const namePattern = /(\*|&|(\p{Letter}[\w.]*)|(\d+\$))/uy;
-const starCommentPatterm = /\*\s*[^=].*$/y;
-const errorDirectivePatterm = /#error\b.*$/iy;
-const numberPattern = /(\$[0-9a-f]+)|(%[01]+)|([0-9]*\.[0-9]*)|([0-9]+))/iy;
+const starCommentPatterm = /\s*\*\s*(?!=)/y;
+const numberPattern = /((\$[0-9a-f]+)|(%[01]+)|([0-9]+\.[0-9]*)|(\.[0-9]+)|([0-9]+))/iy;
 
 export enum TokenType {
 	LiteralString,
 	LiteralNumber,
 	Name,
-	Keyword
+	Keyword,
+	RestOfLine
 }
 
 export interface Token {
@@ -89,7 +89,7 @@ export class Lexer {
 
 	startLex() {
 		this.start = this.end;
-		if (this.match(spacePattern)) this.end = this.start;
+		if (this.match(spacePattern)) this.start = this.end;
 		return this;
 	}
 
@@ -144,13 +144,6 @@ export class Lexer {
 		return this;
 	}
 
-	lexErrorDirective(): Lexer {
-		// #error can be followed by any text
-		if (errorDirectivePatterm.test(this.text))
-			this.end = this.text.length;
-		return this;
-	}
-
 	lexStringLiteral(): Lexer {
 		if (!this.isActive()) return this;
 
@@ -159,13 +152,15 @@ export class Lexer {
 		const firstChar = this.text.charAt(this.start);
 		if (firstChar == "'" || firstChar == '"') {
 			let sawEndQuote = false;
+			this.end++;
 			while (this.end < this.text.length) {
-				this.end++;
-				if (this.text.charAt(this.end) == '\\') this.end++;
 				if (this.text.charAt(this.end) == firstChar) {
 					sawEndQuote = true;
+					this.end++;
 					break;
 				}
+				if (this.text.charAt(this.end) == '\\') this.end++;
+				this.end++;
 			}
 			if (!sawEndQuote) {
 				this.addWarning('Unterminated string literal goes to end of line');
@@ -182,6 +177,15 @@ export class Lexer {
 		for (const keywordPat of keywordPatterns) {
 			if (this.match(keywordPat.pat)) {
 				this.addToken(TokenType.Keyword, keywordPat.keyword);
+
+				// Special case directives whose arguments don't lex normally.
+				if (keywordPat.keyword === '.bhex' ||
+						keywordPat.keyword === '#error') {
+					this.start = this.end;
+					this.end = this.text.length;
+					this.addToken(TokenType.RestOfLine);
+				}
+
 				break;
 			}
 		}
@@ -223,12 +227,15 @@ export function lexLine(text: string, lineNumber: number): Lexer {
 	while (!results.isDone()) {
 		results.startLex()
 			.lexLineComment()
-			.lexErrorDirective()
 			.lexStringLiteral()
 			.lexKeyword()
 			.lexName()
 			.lexNumber()
 			.lexOperator();
+		if (results.isActive()) {
+			results.addError('Syntax error');
+			break;
+		}
 	}
 
 	return results;
