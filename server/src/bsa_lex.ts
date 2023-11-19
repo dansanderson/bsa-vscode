@@ -73,7 +73,7 @@ const opcodePatterns: Array<KeywordPattern> = opcodes.map((kw) => {
 const operators = [
 	'==', '!=', '>=', '<=', '>>', '<<', '&&', '||',
 	':', '^', '<', '>', '(', ')', '[', ']', '+', '-',
-	'*', '/', '!', '~', '&', '|', '^'
+	'*', '/', '!', '~', '&', '|', '^', ',', '#'
 ];
 
 const operatorPatterns: Array<KeywordPattern> = operators.map((kw) => {
