@@ -1,6 +1,6 @@
 import { expect } from '@jest/globals';
 
-import { parseLine, parseBsa } from '../src/bsa';
+import { parseLine, parseBsa } from '../src/bsa_parse';
 
 describe('parseLine: empty and comments', () => {
 	test('empty string returns empty results', () => {

@@ -17,12 +17,9 @@ import {
 } from 'vscode-languageserver-textdocument';
 
 import {
-	ParseResults
-} from './parse';
-
-import {
+	ParseResults,
 	parseBsa
-} from './bsa';
+} from './bsa_parse';
 
 const connection = createConnection(ProposedFeatures.all);
 
