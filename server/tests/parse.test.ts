@@ -4,23 +4,17 @@ import { parseLine, parseBsa } from '../src/bsa';
 
 describe('parseLine: empty and comments', () => {
 	test('empty string returns empty results', () => {
-		const results = parseLine({ line: '', number: 0 });
+		const results = parseLine('', 0);
 		expect(results.diagnostics.length).toBe(0);
 	});
 
 	test('star comment only returns empty results', () => {
-		const results = parseLine({
-			line: '  * star comment',
-			number: 0
-		});
+		const results = parseLine('  * star comment', 0);
 		expect(results.diagnostics.length).toBe(0);
 	});
 
 	test('semicolon comment only returns empty results', () => {
-		const results = parseLine({
-			line: '   ; line comment',
-			number: 0
-		});
+		const results = parseLine('   ; line comment', 0);
 		expect(results.diagnostics.length).toBe(0);
 	});
 });
@@ -28,33 +22,21 @@ describe('parseLine: empty and comments', () => {
 describe('parseLine: conditional assembly', () => {
 	test('#ifdef with symbol ok', () => {
 		let results;
-		results = parseLine({
-			line: '   #ifdef foo',
-			number: 0
-		});
+		results = parseLine('   #ifdef foo', 0);
 		expect(results.diagnostics.length).toBe(0);
-		results = parseLine({
-			line: '#ifdef SYMBOL_NAME    ; with a line comment',
-			number: 0
-		});
+		results = parseLine('#ifdef SYMBOL_NAME    ; with a line comment', 0);
 		expect(results.diagnostics.length).toBe(0);
 	});
 	test('#ifdef missing symbol', () => {
 		let results;
-		results = parseLine({
-			line: '#ifdef',
-			number: 0
-		});
+		results = parseLine('#ifdef', 0);
 		expect(results.diagnostics.length).toBe(1);
 		expect(results.diagnostics[0].message).toEqual(
 			'Missing symbol for #ifdef');
 		expect(results.diagnostics[0].range.start.character).toBe(0);
 		expect(results.diagnostics[0].range.end.character).toBe(6);
 
-		results = parseLine({
-			line: '#ifdef   ; comment',
-			number: 0
-		});
+		results = parseLine('#ifdef   ; comment', 0);
 		expect(results.diagnostics.length).toBe(1);
 		expect(results.diagnostics[0].message).toEqual(
 			'Missing symbol for #ifdef');
@@ -62,10 +44,7 @@ describe('parseLine: conditional assembly', () => {
 		expect(results.diagnostics[0].range.end.character).toBe(6);
 	});
 	test('#ifdef unexpected characters', () => {
-		const results = parseLine({
-			line: '#ifdef SYMBOL_NAME other  ; comment',
-			number: 0
-		});
+		const results = parseLine('#ifdef SYMBOL_NAME other  ; comment', 0);
 		expect(results.diagnostics.length).toBe(1);
 		expect(results.diagnostics[0].message).toEqual(
 			'Unexpected characters after #ifdef');
@@ -75,22 +54,13 @@ describe('parseLine: conditional assembly', () => {
 
 	test('#else ok', () => {
 		let results;
-		results = parseLine({
-			line: '   #else',
-			number: 0
-		});
+		results = parseLine('   #else', 0);
 		expect(results.diagnostics.length).toBe(0);
-		results = parseLine({
-			line: '#else    ; with a line comment',
-			number: 0
-		});
+		results = parseLine('#else    ; with a line comment', 0);
 		expect(results.diagnostics.length).toBe(0);
 	});
 	test('#else error', () => {
-		const results = parseLine({
-			line: '#else err',
-			number: 0
-		});
+		const results = parseLine('#else err', 0);
 		expect(results.diagnostics.length).toBe(1);
 		expect(results.diagnostics[0].message).toEqual(
 			'#else must appear alone on the line');
@@ -100,22 +70,13 @@ describe('parseLine: conditional assembly', () => {
 
 	test('#endif ok', () => {
 		let results;
-		results = parseLine({
-			line: '   #endif',
-			number: 0
-		});
+		results = parseLine('   #endif', 0);
 		expect(results.diagnostics.length).toBe(0);
-		results = parseLine({
-			line: '#endif    ; with a line comment',
-			number: 0
-		});
+		results = parseLine('#endif    ; with a line comment', 0);
 		expect(results.diagnostics.length).toBe(0);
 	});
 	test('#endif error', () => {
-		const results = parseLine({
-			line: '#endif err',
-			number: 0
-		});
+		const results = parseLine('#endif err', 0);
 		expect(results.diagnostics.length).toBe(1);
 		expect(results.diagnostics[0].message).toEqual(
 			'#endif must appear alone on the line');
@@ -129,16 +90,13 @@ describe('parseLine: conditional assembly', () => {
 			'   #error         ; comment',
 			'#error'
 		]) {
-			const results = parseLine({ line: s, number: 0 });
+			const results = parseLine(s, 0);
 			expect(results.diagnostics.length).toBe(0);
 		}
 	});
 
 	test('Unrecognized conditional directive', () => {
-		const results = parseLine({
-			line: '#unrecognized',
-			number: 0
-		});
+		const results = parseLine('#unrecognized', 0);
 		expect(results.diagnostics.length).toBe(1);
 		expect(results.diagnostics[0].message).toEqual(
 			'Unrecognized assembler directive');
@@ -150,22 +108,13 @@ describe('parseLine: conditional assembly', () => {
 describe('parseLine: macros', () => {
 	test('endmac ok', () => {
 		let results;
-		results = parseLine({
-			line: '    endmac',
-			number: 0
-		});
+		results = parseLine('    endmac', 0);
 		expect(results.diagnostics.length).toBe(0);
-		results = parseLine({
-			line: 'endmac    ; with a line comment',
-			number: 0
-		});
+		results = parseLine('endmac    ; with a line comment', 0);
 		expect(results.diagnostics.length).toBe(0);
 	});
 	test('endmac error', () => {
-		const results = parseLine({
-			line: '    endmac err',
-			number: 0
-		});
+		const results = parseLine('    endmac err', 0);
 		expect(results.diagnostics.length).toBe(1);
 		expect(results.diagnostics[0].message).toEqual(
 			'endmac must appear alone on the line');

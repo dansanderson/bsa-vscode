@@ -8,127 +8,261 @@ import {
 	mergeResults
 } from './parse';
 
-interface NumberedLine {
-	line: string,
-	number: number
-}
+import assert = require('assert');
+
 
 function escapeForRegExp(s: string) {
     return s.replace(/[/\-\\^$*+?.()|[\]{}]/g, '\\$&');
 }
 
-function expectPat(pat: RegExp, line: string, pos: number) {
-	const m = pat.exec(line.substring(pos));
-	if (m) {
-		return pos + m[0].length;
-	}
-	return null;
+interface KeywordPattern {
+	keyword: string,
+	pat: RegExp
 }
 
-const emptyOrCommentPat = new RegExp('^\\s*(;.*)?$');
-function expectEmptyOrComment(line: string, pos: number): number | null {
-	return expectPat(emptyOrCommentPat, line, pos);
-}
+const keywords = [
+	'#if', '#ifdef', '#else', '#endif', '#error', 'macro', 'endmac',
+	'.word', '.bigw', '.hex4', '.dec4', '.wor', '.byte', '.byt', '.pet',
+	'.disp', '.bhex', '.lits', '.quad', '.real', '.real4', '.fill', '.bss',
+	'.store', '.cpu', '.base', '.org', '.load', '.include', '.size', '.ski',
+	'.pag', '.nam', '.subttl', '.end', '.case', '!src', '!addr'
+];
 
-const namePat = new RegExp('^\\p{Letter}[\\w\\.]*', 'iu');
-function expectName(line: string, pos: number): number | null {
-	return expectPat(namePat, line, pos);
-}
-
-function makeLineError(numLine: NumberedLine, start: number, end: number, message: string): Diagnostic {
+const keywordPatterns: Array<KeywordPattern> = keywords.map((kw) => {
 	return {
-		severity: DiagnosticSeverity.Error,
-		range: {
-			start: { line: numLine.number, character: start },
-			end: { line: numLine.number, character: end },
-		},
-		message: message
+		keyword: kw,
+		pat: RegExp(escapeForRegExp(kw) + '\\b', 'iy')
 	};
+});
+
+// Operator tokens, in longest-to-shortest match order
+const operators = [
+	'==', '!=', '>=', '<=', '>>', '<<', '&&', '||',
+	':', '^', '<', '>', '(', ')', '[', ']', '+', '-',
+	'*', '/', '!', '~', '&', '|', '^'
+];
+
+const operatorPatterns: Array<KeywordPattern> = operators.map((kw) => {
+	return {
+		keyword: kw,
+		pat: RegExp(escapeForRegExp(kw) + '\\b', 'iy')
+	};
+});
+
+const spacePattern = /\s*/y;
+const namePattern = /(\*|&|(\p{Letter}[\w.]*)|(\d+\$))/uy;
+const starCommentPatterm = /\*\s*[^=].*$/y;
+const errorDirectivePatterm = /#error\b.*$/iy;
+const numberPattern = /(\$[0-9a-f]+)|(%[01]+)|([0-9]*\.[0-9]*)|([0-9]+))/iy;
+
+enum TokenType {
+	LiteralString,
+	LiteralNumber,
+	Name,
+	Keyword
 }
 
-export function parseLine(numLine: NumberedLine): ParseResults {
+interface Token {
+	type: TokenType,
+	lineNumber: number,
+	start: number,
+	end: number,
+	normText?: string
+}
+
+export class Lexer {
+	public text: string;
+	public lineNumber: number;
+	public start: number = 0;
+	public end: number = 0;
+	public tokens: Array<Token> = [];
+	public diagnostics: Array<Diagnostic> = [];
+
+	constructor(text: string, lineNumber: number) {
+		this.text = text;
+		this.lineNumber = lineNumber;
+	}
+
+	match(pat: RegExp) {
+		assert (pat.flags.includes('y'));
+		pat.lastIndex = this.start;
+		const result = pat.exec(this.text);
+		if (result !== null) {
+			this.end = this.start + result[0].length;
+		}
+		return result !== null;
+	}
+
+	startLex() {
+		this.start = this.end;
+		if (this.match(spacePattern)) this.end = this.start;
+		return this;
+	}
+
+	isActive() {
+		return this.end === this.start;
+	}
+
+	isDone() {
+		return this.end === this.text.length;
+	}
+
+	addDiagnostic(message: string, severity: DiagnosticSeverity) {
+		this.diagnostics.push({
+			severity: severity,
+			range: {
+				start: { line: this.lineNumber, character: this.start },
+				end: { line: this.lineNumber, character: this.end },
+			},
+			message: message
+		});
+	}
+
+	addWarning(message: string) {
+		this.addDiagnostic(message, DiagnosticSeverity.Warning);
+	}
+
+	addError(message: string) {
+		this.addDiagnostic(message, DiagnosticSeverity.Error);
+	}
+
+	addToken(type: TokenType, normText?: string) {
+		this.tokens.push({
+			type: type,
+			lineNumber: this.lineNumber,
+			start: this.start,
+			end: this.end,
+			normText: normText
+		});
+	}
+
+	lexStarComment(): Lexer {
+		// Entire line matches star comment
+		if (starCommentPatterm.test(this.text))
+			this.end = this.text.length;
+		return this;
+	}
+
+	lexLineComment(): Lexer {
+		// Rest of line matches line comment
+		if (this.text.charAt(this.start) == ';')
+			this.end = this.text.length;
+		return this;
+	}
+
+	lexErrorDirective(): Lexer {
+		// #error can be followed by any text
+		if (errorDirectivePatterm.test(this.text))
+			this.end = this.text.length;
+		return this;
+	}
+
+	lexStringLiteral(): Lexer {
+		if (!this.isActive()) return this;
+
+		// BSA string literals cannot span lines, so this terminates an
+		// unterminated literal at the end of the line with a warning.
+		const firstChar = this.text.charAt(this.start);
+		if (firstChar == "'" || firstChar == '"') {
+			let sawEndQuote = false;
+			while (this.end < this.text.length) {
+				this.end++;
+				if (this.text.charAt(this.end) == '\\') this.end++;
+				if (this.text.charAt(this.end) == firstChar) {
+					sawEndQuote = true;
+					break;
+				}
+			}
+			if (!sawEndQuote) {
+				this.addWarning('Unterminated string literal goes to end of line');
+			}
+
+			this.addToken(TokenType.LiteralString);
+		}
+
+		return this;
+	}
+
+	lexKeyword(): Lexer {
+		if (!this.isActive()) return this;
+		for (const keywordPat of keywordPatterns) {
+			if (this.match(keywordPat.pat)) {
+				this.addToken(TokenType.Keyword, keywordPat.keyword);
+				break;
+			}
+		}
+		return this;
+	}
+
+	lexOperator(): Lexer {
+		if (!this.isActive()) return this;
+		for (const operatorPat of operatorPatterns) {
+			if (this.match(operatorPat.pat)) {
+				this.addToken(TokenType.Keyword, operatorPat.keyword);
+				break;
+			}
+		}
+		return this;
+	}
+
+	lexName(): Lexer {
+		if (!this.isActive()) return this;
+		if (this.match(namePattern)) {
+			this.addToken(TokenType.Name);
+		}
+		return this;
+	}
+
+	lexNumber(): Lexer {
+		if (!this.isActive()) return this;
+		if (this.match(numberPattern)) {
+			this.addToken(TokenType.LiteralNumber);
+		}
+		return this;
+	}
+}
+
+export function lexLine(text: string, lineNumber: number): Lexer {
+	let results: Lexer = new Lexer(text, lineNumber);
+
+	results = results.startLex().lexStarComment();
+	while (!results.isDone()) {
+		results.startLex()
+			.lexLineComment()
+			.lexErrorDirective()
+			.lexStringLiteral()
+			.lexKeyword()
+			.lexName()
+			.lexNumber()
+			.lexOperator();
+	}
+
+	return results;
+}
+
+export function parseLine(text: string, lineNumber: number): ParseResults {
 	const results: ParseResults = {
 		diagnostics: []
 	};
 
-	let charIndex = 0;
+	const lexResults = lexLine(text, lineNumber);
+	results.diagnostics.concat(lexResults.diagnostics);
 
-	// Skip leading whitespace
-	const trimmed = numLine.line.trimStart();
-	charIndex = numLine.line.length - trimmed.length;
-
-	// Star comment
-	if (trimmed.startsWith('*')) {
-		let i = charIndex + 1;
-		while (/\s/.test(numLine.line.charAt(i))) {
-			i++;
-		}
-		if (numLine.line.charAt(i) != '=') {
-			return results;
-		}
-	}
-
-	// TODO: Does BSA support #... not in the first column? With comment after?
-
-	// Items that must appear alone on the line
-	for (const term of ['#else', '#endif', 'endmac']) {
-		const pat = new RegExp('^' + escapeForRegExp(term) + '\\b', 'i');
-		if (pat.test(trimmed)) {
-			if (expectEmptyOrComment(trimmed, term.length) == null) {
-				results.diagnostics.push(makeLineError(
-					numLine, charIndex, charIndex + term.length,
-					term + ' must appear alone on the line'));
-			}
-			return results;
-		}
-	}
-
-	// Conditional assembly directives
-	if (/^#if\b/i.test(trimmed)) {
-		// TODO: #if {expr}
-		return results;
-	}
-	if (/^#ifdef\b/i.test(trimmed)) {
-		// #ifdef {sym}
-		const e = expectName(numLine.line, charIndex + 7);
-		if (e == null) {
-			results.diagnostics.push(makeLineError(
-				numLine, charIndex, charIndex + 6,
-				'Missing symbol for #ifdef'));
-		} else if (expectEmptyOrComment(numLine.line, e) == null) {
-			results.diagnostics.push(makeLineError(
-				numLine, e, e,
-				'Unexpected characters after #ifdef'));
-		}
-		return results;
-	}
-	if (/^#error\b/i.test(trimmed)) {
-		// Any text can follow #error.
-		return results;
-	}
-
-	if (trimmed.startsWith('#')) {
-		results.diagnostics.push(makeLineError(
-			numLine, charIndex, charIndex + 1,
-			'Unrecognized assembler directive'));
-		return results;
-	}
-
-	// Macro definition start
-	if (/macro\b/i.test(trimmed)) {
-		// TODO: macro {name}({arglist})
-		// TODO: record macro definition location
-	}
-
-	// Assignment
-	//   * = {expr}
-	//   & = {expr}
-	//   {sym} = {expr}
-
-	// [{sym}:?] {pseudo-opcode} {args}
-	// [{sym}:?] {opcode} {addr-expr}
-	// [{sym}:?]
-	// same for local labels (\d+\$)
+	// TODO: parse lexResults.tokens, accrue parser diagnostics
+	// - Keywords that must appear alone on the line: ['#else', '#endif', 'endmac']
+	// - #if {expr}
+	// - #ifdef {sym}
+	// - Unrecognized #... directive
+	// - macro {sym}([arglist])
+	//   - record macro definition
+	// - Assignment
+	//    * = {expr}
+	//    & = {expr}
+	//    {sym} = {expr}
+	// - [{sym}:?] {pseudo-opcode} {args}
+	// - [{sym}:?] {opcode} {addr-expr}
+	// - [{sym}:?]
+	//   - record label; ignore local labels (\d+\$)
 
 	return results;
 }
@@ -136,8 +270,7 @@ export function parseLine(numLine: NumberedLine): ParseResults {
 export function parseBsa(s: string): ParseResults {
 	let lineNum = 0;
 	const results = s.split('\n')
-		.map((lineString) => { return { line: lineString, number: lineNum++ }; })
-		.map(parseLine)
+		.map((line) => parseLine(line, lineNum++))
 		.reduce(mergeResults);
 
 	return results;
