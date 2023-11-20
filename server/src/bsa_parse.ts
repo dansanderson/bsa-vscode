@@ -125,9 +125,7 @@ export class Parser {
 		if (this.isDone()) return this;
 
 		// #ifdef {sym}
-		if (this.lex.tokens[0].type === TokenType.Keyword &&
-				this.lex.tokens[0].normText === '#ifdef') {
-			this.pos++;
+		if (this.pos === 0 && !!this.expectTokenWithText(TokenType.Keyword, '#ifdef')) {
 			const nameTok = this.expectToken(TokenType.Name);
 			if (nameTok) {
 				this.addUse(this.symbolUses, nameTok);
@@ -137,6 +135,20 @@ export class Parser {
 					DiagnosticSeverity.Error, this.lex.tokens[0]);
 			}
 			this.pos = this.lex.tokens.length;
+		} else if (this.lex.tokens.length > 1) {
+			let foundErrant = false;
+			const prevPos = this.pos;
+			for (this.pos = 1; this.pos < this.lex.tokens.length; this.pos++) {
+				if (this.expectTokenWithText(TokenType.Keyword, '#ifdef')) {
+					foundErrant = true;
+					this.addDiagnosticForToken(
+						'Unexpected text before #ifdef',
+						DiagnosticSeverity.Error, this.lex.tokens[this.pos - 1]);
+					// (length - 1 because for() increments one more time)
+					this.pos = this.lex.tokens.length - 1;
+				}
+			}
+			if (!foundErrant) this.pos = prevPos;
 		}
 
 		return this;
@@ -145,8 +157,7 @@ export class Parser {
 	handleUnrecognizedHashDirective() {
 		if (this.isDone()) return this;
 
-		if (this.lex.tokens[0].type === TokenType.Operator &&
-				this.lex.tokens[0].normText === '#') {
+		if (this.pos === 0 && !!this.expectTokenWithText(TokenType.Operator, '#')) {
 			this.addDiagnosticForToken(
 				'Unrecognized conditional assembly directive',
 				DiagnosticSeverity.Error, this.lex.tokens[0]);
@@ -159,9 +170,7 @@ export class Parser {
 	parseMacroDefinitionStart() {
 		if (this.isDone()) return this;
 
-		if (this.lex.tokens[0].type === TokenType.Keyword &&
-				this.lex.tokens[0].normText === 'macro') {
-
+		if (this.expectTokenWithText(TokenType.Keyword, 'macro')) {
 			const nameTok = this.expectToken(TokenType.Name);
 			if (nameTok) {
 				if (!this.expectTokenWithText(TokenType.Operator, '(')) {
@@ -176,15 +185,21 @@ export class Parser {
 
 					if (!this.expectTokenWithText(TokenType.Operator, ')')) {
 						this.addDiagnosticForToken(
-							'Expected ) for macro definition',
+							'Missing ) for macro definition',
 							DiagnosticSeverity.Error,
-							this.isDone() ? this.lex.tokens[this.pos] : this.lex.tokens[this.pos - 1]);
+							nameTok);
 					} else if (!this.isDone()) {
 						this.addDiagnosticForToken(
 							'Unexpected text after macro definition start',
 							DiagnosticSeverity.Error, this.lex.tokens[this.pos]);
+					} else {
+						this.macroDefinitions.push(nameTok);
 					}
 				}
+			} else {
+				this.addDiagnosticForToken(
+					'Missing name for macro definition',
+					DiagnosticSeverity.Error, this.lex.tokens[this.pos]);
 			}
 			this.pos = this.lex.tokens.length;
 		}

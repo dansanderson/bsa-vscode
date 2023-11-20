@@ -177,9 +177,135 @@ describe('parseSoloTokens', () => {
 });
 
 // TODO: describe('parseIfDirective', () => {});
-// TODO: describe('parseIfDefDirective', () => {});
-// TODO: describe('handleUnrecognizedHashDirective', () => {});
-// TODO: describe('parseMacroDefinitionStart', () => {});
+
+describe('parseIfDefDirective', () => {
+	test('does nothing if not present', () => {
+		const par = new Parser('sym: lda #$ff', 7);
+		par.startParse().parseIfDefDirective();
+		expect(par.isDone()).toBe(false);
+		expect(par.diagnostics.length).toBe(0);
+		expect(par.pos).toBe(0);
+	});
+
+	test('succeeds on valid statement', () => {
+		const par = new Parser('#ifdef sym', 7);
+		par.startParse().parseIfDefDirective();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics.length).toBe(0);
+		expect(par.symbolUses.get('sym')?.length).toBe(1);
+		expect(par.symbolUses.get('sym')?.[0].normText).toEqual('sym');
+		expect(par.symbolUses.get('sym')?.[0].lineNumber).toEqual(7);
+		expect(par.symbolUses.get('sym')?.[0].start).toEqual(7);
+	});
+
+	test('errors if missing symbol', () => {
+		const par = new Parser('#ifdef', 7);
+		par.startParse().parseIfDefDirective();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics.length).toBe(1);
+		expect(par.diagnostics[0].message.includes('Missing symbol')).toBe(true);
+	});
+
+	test('errors if token before keyword', () => {
+		const par = new Parser('sym #ifdef', 7);
+		par.startParse().parseIfDefDirective();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics.length).toBe(1);
+		expect(par.diagnostics[0].message.includes('before')).toBe(true);
+	});
+});
+
+describe('handleUnrecognizedHashDirective', () => {
+	test('does nothing if does not start with #', () => {
+		const par = new Parser('sym: lda #$ff', 7);
+		par.startParse().handleUnrecognizedHashDirective();
+		expect(par.isDone()).toBe(false);
+		expect(par.diagnostics.length).toBe(0);
+	});
+
+	test('reports unrecognized conditional assembly directive', () => {
+		const par = new Parser('#$ff lda sym:', 7);
+		par.startParse().handleUnrecognizedHashDirective();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics.length).toBe(1);
+	});
+});
+
+describe('parseMacroDefinitionStart', () => {
+	test('does nothing if not macro definition', () => {
+		const par = new Parser('sym: lda #$ff', 7);
+		par.startParse().parseMacroDefinitionStart();
+		expect(par.isDone()).toBe(false);
+		expect(par.diagnostics.length).toBe(0);
+		expect(par.pos).toBe(0);
+	});
+
+	test('macro start, no args', () => {
+		const par = new Parser('macro name()', 7);
+		par.startParse().parseMacroDefinitionStart();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics.length).toBe(0);
+		expect(par.macroDefinitions.length).toBe(1);
+		expect(par.macroDefinitions[0].lineNumber).toBe(7);
+		expect(par.macroDefinitions[0].normText).toBe('name');
+	});
+
+	test('macro start, one arg', () => {
+		const par = new Parser('macro name(arg1)', 7);
+		par.startParse().parseMacroDefinitionStart();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics.length).toBe(0);
+		expect(par.macroDefinitions.length).toBe(1);
+		expect(par.macroDefinitions[0].lineNumber).toBe(7);
+		expect(par.macroDefinitions[0].normText).toBe('name');
+	});
+
+	test('macro start, three args', () => {
+		const par = new Parser('macro name(arg1, arg2, arg3)', 7);
+		par.startParse().parseMacroDefinitionStart();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics.length).toBe(0);
+		expect(par.macroDefinitions.length).toBe(1);
+		expect(par.macroDefinitions[0].lineNumber).toBe(7);
+		expect(par.macroDefinitions[0].normText).toBe('name');
+	});
+
+	test('missing name', () => {
+		const par = new Parser('macro (arg1, arg2, arg3)', 7);
+		par.startParse().parseMacroDefinitionStart();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics.length).toBe(1);
+		expect(par.diagnostics[0].message.includes('Missing name')).toBe(true);
+		expect(par.macroDefinitions.length).toBe(0);
+	});
+
+	test('missing (', () => {
+		const par = new Parser('macro name arg1, arg2, arg3)', 7);
+		par.startParse().parseMacroDefinitionStart();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics.length).toBe(1);
+		expect(par.diagnostics[0].message.includes('Missing (')).toBe(true);
+		expect(par.macroDefinitions.length).toBe(0);
+	});
+
+	test('missing )', () => {
+		const par = new Parser('macro name(arg1, arg2, arg3', 7);
+		par.startParse().parseMacroDefinitionStart();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics.length).toBe(1);
+		expect(par.diagnostics[0].message.includes('Missing )')).toBe(true);
+		expect(par.macroDefinitions.length).toBe(0);
+	});
+
+	test('unexpected text after', () => {
+		const par = new Parser('macro name(arg1, arg2, arg3) etc', 7);
+		par.startParse().parseMacroDefinitionStart();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics.length).toBe(1);
+		expect(par.diagnostics[0].message.includes('Unexpected')).toBe(true);
+		expect(par.macroDefinitions.length).toBe(0);
+	});
+});
 
 describe('parseLine: empty and comments', () => {
 	test('empty string returns empty results', () => {
