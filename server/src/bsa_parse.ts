@@ -3,7 +3,24 @@ import {
 	DiagnosticSeverity
 } from 'vscode-languageserver/node';
 
-import { lexLine, Token, TokenType } from './bsa_lex';
+import { LexerResult, lexLine, Token, TokenType } from './bsa_lex';
+
+export interface ParserResult {
+	diagnostics: Diagnostic[];
+	symbolDefinitions: Token[];
+	symbolUses: Map<string, Array<Token>>;
+	macroDefinitions: Token[];
+	macroUses: Map<string, Array<Token>>;
+}
+
+export function mergeParserResultsLeft(first: ParserResult, second: ParserResult): ParserResult {
+	first.diagnostics = first.diagnostics.concat(second.diagnostics);
+	first.symbolDefinitions = first.symbolDefinitions.concat(second.symbolDefinitions);
+	first.macroDefinitions = first.macroDefinitions.concat(second.macroDefinitions);
+	second.symbolUses.forEach((v, k) => { first.symbolUses.set(k, v); });
+	second.macroUses.forEach((v, k) => { first.macroUses.set(k, v); });
+	return first;
+}
 
 export class Parser {
 	diagnostics: Diagnostic[] = [];
@@ -11,6 +28,15 @@ export class Parser {
 	symbolUses: Map<string, Array<Token>> = new Map();
 	macroDefinitions: Token[] = [];
 	macroUses: Map<string, Array<Token>> = new Map();
+	pos: number = 0;
+	lex: LexerResult;
+
+	constructor(
+			public text: string,
+			public lineNumber: number) {
+		this.lex = lexLine(this.text, this.lineNumber);
+		this.diagnostics.concat(this.lex.diagnostics);
+	}
 
 	addDiagnosticForTokenRange(message: string, severity: DiagnosticSeverity, startToken: Token, endToken: Token) {
 		this.diagnostics.push({
@@ -27,68 +53,198 @@ export class Parser {
 		this.addDiagnosticForTokenRange(message, severity, token, token);
 	}
 
-	parseLine(text: string, lineNumber: number) {
-		const lexResults = lexLine(text, lineNumber);
-		this.diagnostics.concat(lexResults.diagnostics);
+	addUse(tokMap: Map<string, Array<Token>>, tok: Token) {
+		if (!tok.normText) return;
+		if (!tokMap.has(tok.normText)) {
+			tokMap.set(tok.normText, []);
+		}
+		tokMap.get(tok.normText)?.push(tok);
+	}
 
-		if (lexResults.tokens.length == 0) return;
+	startParse() {
+		this.pos = 0;
+		return this;
+	}
+
+	isDone() {
+		return this.pos === this.lex.tokens.length;
+	}
+
+	expectToken(type: TokenType) {
+		if (this.isDone()) return undefined;
+		if (this.lex.tokens[this.pos].type === type) {
+			return this.lex.tokens[this.pos++];
+		}
+		return undefined;
+	}
+
+	expectTokenWithText(type: TokenType, text: string) {
+		if (this.isDone()) return undefined;
+		if (this.lex.tokens[this.pos].type === type &&
+				this.lex.tokens[this.pos].normText === text) {
+			return this.lex.tokens[this.pos++];
+		}
+		return undefined;
+	}
+
+	parseSoloTokens() {
+		if (this.isDone()) return this;
 
 		// Keywords that must appear alone on the line
 		for (const kw of ['#else', '#endif', 'endmac']) {
-			if (lexResults.tokens[0].type === TokenType.Keyword &&
-					lexResults.tokens[0].normText === kw) {
-				if (lexResults.tokens.length > 1) {
+			if (this.pos === 0 && !!this.expectTokenWithText(TokenType.Keyword, kw)) {
+				if (this.lex.tokens.length > 1) {
 					this.addDiagnosticForToken(
-						'Unexpected text after ' + lexResults.tokens[0].normText,
-						DiagnosticSeverity.Error, lexResults.tokens[0]);
+						'Unexpected text after ' + this.lex.tokens[0].normText,
+						DiagnosticSeverity.Error, this.lex.tokens[0]);
 				}
-			} else if (lexResults.tokens.length > 1) {
-				for (let i = 1; i < lexResults.tokens.length; i++) {
-					if (lexResults.tokens[i].normText === kw) {
+				this.pos = this.lex.tokens.length;
+			} else if (this.lex.tokens.length > 1) {
+				let foundErrant = false;
+				const prevPos = this.pos;
+				for (this.pos = 1; this.pos < this.lex.tokens.length; this.pos++) {
+					if (this.expectTokenWithText(TokenType.Keyword, kw)) {
+						foundErrant = true;
 						this.addDiagnosticForToken(
-							'Unexpected text before ' + lexResults.tokens[i].normText,
-							DiagnosticSeverity.Error, lexResults.tokens[i]);
+							'Unexpected text before ' + kw,
+							DiagnosticSeverity.Error, this.lex.tokens[this.pos - 1]);
+						// (length - 1 because for() increments one more time)
+						this.pos = this.lex.tokens.length - 1;
 					}
 				}
+				if (!foundErrant) this.pos = prevPos;
 			}
 		}
 
-		// TODO:
-		// - #if {expr}
-		// - #ifdef {sym}
-		// - Unrecognized #... directive
-		// - macro {sym}([arglist])
-		//   - record macro definition
-		// - Assignment
-		//    * = {expr}
-		//    & = {expr}
-		//    {sym} = {expr}
-		// - [{sym}:?] {macro-name} '(' [{expr} [',' {expr}...]] ')'
-		//   - record macro use
-		// - [{sym}:?] {pseudo-opcode} {args}
-		// - [{sym}:?] {opcode} {addr-expr}
-		// - [{sym}:?]
-		//   - record label; ignore local labels (\d+\$)
-		//
-		// - expr parsing
-		//   - record symbol use
-		// - addressing mode parsing
-		//   '#' {expr}
-		//   {expr}
-		//   {expr} ',' [xyz]
-		//   '(' {expr} ')' ',' [xyz]
-		//   '(' {expr} ',' [xy] ')'
-		//   '(' {expr} ')'
-		//   '[' {expr} ']' ',z'
-		//   '[' {expr} ']'
+		return this;
 	}
+
+	// TODO: parseIfDirective()  #if {expr}
+
+	parseIfDefDirective() {
+		if (this.isDone()) return this;
+
+		// #ifdef {sym}
+		if (this.lex.tokens[0].type === TokenType.Keyword &&
+				this.lex.tokens[0].normText === '#ifdef') {
+			this.pos++;
+			const nameTok = this.expectToken(TokenType.Name);
+			if (nameTok) {
+				this.addUse(this.symbolUses, nameTok);
+			} else {
+				this.addDiagnosticForToken(
+					'Missing symbol for #ifdef',
+					DiagnosticSeverity.Error, this.lex.tokens[0]);
+			}
+			this.pos = this.lex.tokens.length;
+		}
+
+		return this;
+	}
+
+	handleUnrecognizedHashDirective() {
+		if (this.isDone()) return this;
+
+		if (this.lex.tokens[0].type === TokenType.Operator &&
+				this.lex.tokens[0].normText === '#') {
+			this.addDiagnosticForToken(
+				'Unrecognized conditional assembly directive',
+				DiagnosticSeverity.Error, this.lex.tokens[0]);
+			this.pos = this.lex.tokens.length;
+		}
+
+		return this;
+	}
+
+	parseMacroDefinitionStart() {
+		if (this.isDone()) return this;
+
+		if (this.lex.tokens[0].type === TokenType.Keyword &&
+				this.lex.tokens[0].normText === 'macro') {
+
+			const nameTok = this.expectToken(TokenType.Name);
+			if (nameTok) {
+				if (!this.expectTokenWithText(TokenType.Operator, '(')) {
+					this.addDiagnosticForToken(
+						'Missing ( for macro definition',
+						DiagnosticSeverity.Error, nameTok);
+				} else {
+					let expectArgs = true;
+					while (expectArgs && this.expectToken(TokenType.Name)) {
+						expectArgs = !!this.expectTokenWithText(TokenType.Operator, ',');
+					}
+
+					if (!this.expectTokenWithText(TokenType.Operator, ')')) {
+						this.addDiagnosticForToken(
+							'Expected ) for macro definition',
+							DiagnosticSeverity.Error,
+							this.isDone() ? this.lex.tokens[this.pos] : this.lex.tokens[this.pos - 1]);
+					} else if (!this.isDone()) {
+						this.addDiagnosticForToken(
+							'Unexpected text after macro definition start',
+							DiagnosticSeverity.Error, this.lex.tokens[this.pos]);
+					}
+				}
+			}
+			this.pos = this.lex.tokens.length;
+		}
+
+		return this;
+	}
+
+	// TODO:
+	// - Assignment
+	//    * = {expr}
+	//    & = {expr}
+	//    {sym} = {expr}
+	// - [{sym}:?] {macro-name} '(' [{expr} [',' {expr}...]] ')'
+	//   - record macro use
+	// - [{sym}:?] {pseudo-opcode} {args}
+	// - [{sym}:?] {opcode} {addr-expr}
+	// - [{sym}:?]
+	//   - record label; ignore local labels (\d+\$)
+	//
+	// - expr parsing
+	//   - record symbol use
+	// - addressing mode parsing
+	//   '#' {expr}
+	//   {expr}
+	//   {expr} ',' [xyz]
+	//   '(' {expr} ')' ',' [xyz]
+	//   '(' {expr} ',' [xy] ')'
+	//   '(' {expr} ')'
+	//   '[' {expr} ']' ',z'
+	//   '[' {expr} ']'
 }
 
-export function parseBsa(bodyText: string): Parser {
-	const par = new Parser();
+export function parseLine(text: string, lineNumber: number): ParserResult {
+	const par = new Parser(text, lineNumber)
+		.startParse()
+		.parseSoloTokens()
+		// TODO: .parseIfDirective()
+		.parseIfDefDirective()
+		.handleUnrecognizedHashDirective()
+		.parseMacroDefinitionStart();
+	if (!par.isDone()) {
+		par.addDiagnosticForTokenRange(
+			'Syntax error', DiagnosticSeverity.Error,
+			par.lex.tokens[0], par.lex.tokens[0]);
+	}
+	return {
+		diagnostics: par.diagnostics,
+		symbolDefinitions: par.symbolDefinitions,
+		symbolUses: par.symbolUses,
+		macroDefinitions: par.macroDefinitions,
+		macroUses: par.macroUses
+	};
+}
+
+export function parseBsa(bodyText: string): ParserResult {
 	let lineNum = 0;
-	bodyText.split('\n').forEach((line) => par.parseLine(line, lineNum++));
-	return par;
+	const results: ParserResult = bodyText.split('\n')
+		.map((line) => parseLine(line, lineNum++))
+		.reduce(mergeParserResultsLeft);
+	return results;
 }
 
 // Symbol equal definition   ^\s*{sym}\s*=\s*{expr}

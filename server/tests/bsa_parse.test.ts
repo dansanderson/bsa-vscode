@@ -1,130 +1,202 @@
 import { expect } from '@jest/globals';
 
-import { Parser, parseBsa } from '../src/bsa_parse';
+import { Parser, parseLine, parseBsa } from '../src/bsa_parse';
+import { DiagnosticSeverity } from 'vscode-languageserver';
+import { Token, TokenType } from '../src/bsa_lex';
+
+describe('Parser diagnostics', () => {
+	test('addDiagnosticForTokenRange', () => {
+		const par = new Parser('', 7);
+		par.addDiagnosticForTokenRange(
+			'error message', DiagnosticSeverity.Error,
+			{ type: TokenType.Keyword, lineNumber: 7, start: 3, end: 5 },
+			{ type: TokenType.Keyword, lineNumber: 7, start: 8, end: 11 });
+		expect(par.diagnostics.length).toBe(1);
+		expect(par.diagnostics[0].severity).toBe(DiagnosticSeverity.Error);
+		expect(par.diagnostics[0].range.start.line).toBe(7);
+		expect(par.diagnostics[0].range.start.character).toBe(3);
+		expect(par.diagnostics[0].range.end.line).toBe(7);
+		expect(par.diagnostics[0].range.end.character).toBe(11);
+		expect(par.diagnostics[0].message).toEqual('error message');
+	});
+
+	test('addDiagnosticForToken', () => {
+		const par = new Parser('', 7);
+		par.addDiagnosticForToken(
+			'error message', DiagnosticSeverity.Error,
+			{ type: TokenType.Keyword, lineNumber: 7, start: 3, end: 5 });
+		expect(par.diagnostics.length).toBe(1);
+		expect(par.diagnostics[0].severity).toBe(DiagnosticSeverity.Error);
+		expect(par.diagnostics[0].range.start.line).toBe(7);
+		expect(par.diagnostics[0].range.start.character).toBe(3);
+		expect(par.diagnostics[0].range.end.line).toBe(7);
+		expect(par.diagnostics[0].range.end.character).toBe(5);
+		expect(par.diagnostics[0].message).toEqual('error message');
+	});
+});
+
+describe('Parser addUse', () => {
+	test('new entry', () => {
+		const par = new Parser('', 7);
+		const tokMap = new Map();
+		const tok: Token = { type: TokenType.Keyword, lineNumber: 7, start: 3, end: 5, normText: 'test' };
+		expect(tokMap.get('test')).toBeUndefined();
+		par.addUse(tokMap, tok);
+		expect(tokMap.get('test')?.length).toBe(1);
+		expect(tokMap.get('test')?.[0].normText).toEqual('test');
+		expect(tokMap.get('test')?.[0].type).toEqual(TokenType.Keyword);
+	});
+
+	test('existing entry', () => {
+		const par = new Parser('', 7);
+		const tokMap = new Map();
+		const tok1: Token = { type: TokenType.Keyword, lineNumber: 7, start: 3, end: 5, normText: 'test' };
+		const tok2: Token = { type: TokenType.Keyword, lineNumber: 7, start: 8, end: 11, normText: 'test' };
+		tokMap.set('test', [tok1]);
+		par.addUse(tokMap, tok2);
+		expect(tokMap.get('test')?.length).toBe(2);
+		expect(tokMap.get('test')?.[1].normText).toEqual('test');
+		expect(tokMap.get('test')?.[1].type).toBe(TokenType.Keyword);
+		expect(tokMap.get('test')?.[0].end).toBe(5);
+		expect(tokMap.get('test')?.[1].end).toBe(11);
+	});
+});
+
+describe('isDone', () => {
+	test('false at start when there is a token', () => {
+		const par = new Parser('name', 7);
+		expect(par.startParse().isDone()).toBe(false);
+	});
+
+	test('true at start when statement parses to no tokens', () => {
+		const par = new Parser('   ; just a line comment', 7);
+		expect(par.startParse().isDone()).toBe(true);
+	});
+
+	test('true after pos is advanced to end', () => {
+		const par = new Parser('name', 7);
+		par.startParse();
+		par.pos = par.lex.tokens.length;
+		expect(par.isDone()).toBe(true);
+	});
+});
+
+describe('expectToken', () => {
+	test('undefined when parser is done', () => {
+		const par = new Parser('name', 7);
+		par.startParse();
+		par.pos = par.lex.tokens.length;
+		expect(par.expectToken(TokenType.Name)).toBeUndefined();
+	});
+
+	test('undefined when token not found, pos not moved', () => {
+		const par = new Parser('name', 7);
+		expect(par.pos).toBe(0);
+		expect(par.startParse().expectToken(TokenType.Keyword)).toBeUndefined();
+		expect(par.pos).toBe(0);
+	});
+
+	test('returns token and advances pos', () => {
+		const par = new Parser('name', 7);
+		expect(par.pos).toBe(0);
+		const tok = par.startParse().expectToken(TokenType.Name);
+		expect(tok?.start).toBe(0);
+		expect(tok?.end).toBe(4);
+		expect(tok?.type).toBe(TokenType.Name);
+		expect(tok?.lineNumber).toBe(7);
+		expect(tok?.normText).toBe('name');
+		expect(par.pos).toBe(1);
+	});
+
+	test('with text fails when text does not match', () => {
+		const par = new Parser('name', 7);
+		expect(par.pos).toBe(0);
+		const tok = par.startParse().expectTokenWithText(TokenType.Name, 'other');
+		expect(tok).toBeUndefined();
+		expect(par.pos).toBe(0);
+	});
+
+	test('with text succeeds when text matches', () => {
+		const par = new Parser('name', 7);
+		expect(par.pos).toBe(0);
+		const tok = par.startParse().expectTokenWithText(TokenType.Name, 'name');
+		expect(tok?.type).toBe(TokenType.Name);
+		expect(tok?.normText).toBe('name');
+		expect(par.pos).toBe(1);
+	});
+});
+
+describe('parseSoloTokens', () => {
+	test('does nothing when done', () => {
+		const par = new Parser('  ; line comment', 7);
+		par.startParse().parseSoloTokens();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics.length).toBe(0);
+	});
+
+	test('does nothing if solo tokens are not present', () => {
+		const par = new Parser('sym: lda #$ff', 7);
+		par.startParse().parseSoloTokens();
+		expect(par.isDone()).toBe(false);
+		expect(par.diagnostics.length).toBe(0);
+		expect(par.pos).toBe(0);
+	});
+
+	test('consumes solo token without error if only token on the line', () => {
+		let par = new Parser('  #else    ; line comment', 7);
+		par.startParse().parseSoloTokens();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics.length).toBe(0);
+
+		par = new Parser('#endif', 7);
+		par.startParse().parseSoloTokens();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics.length).toBe(0);
+
+		par = new Parser('  endmac', 7);
+		par.startParse().parseSoloTokens();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics.length).toBe(0);
+	});
+
+	test('errors if token after keyword', () => {
+		const par = new Parser('  endmac name', 7);
+		par.startParse().parseSoloTokens();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics.length).toBe(1);
+		expect(par.diagnostics[0].message.includes('after')).toBe(true);
+	});
+
+	test('errors if token before keyword', () => {
+		const par = new Parser('sym: endmac', 7);
+		par.startParse().parseSoloTokens();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics.length).toBe(1);
+		expect(par.diagnostics[0].message.includes('before')).toBe(true);
+	});
+});
+
+// TODO: describe('parseIfDirective', () => {});
+// TODO: describe('parseIfDefDirective', () => {});
+// TODO: describe('handleUnrecognizedHashDirective', () => {});
+// TODO: describe('parseMacroDefinitionStart', () => {});
 
 describe('parseLine: empty and comments', () => {
 	test('empty string returns empty results', () => {
-		const par = new Parser();
-		par.parseLine('', 0);
+		const par = parseLine('', 0);
 		expect(par.diagnostics.length).toBe(0);
 	});
 
 	test('star comment only returns empty results', () => {
-		const par = new Parser();
-		par.parseLine('  * star comment', 0);
+		const par = parseLine('  * star comment', 0);
 		expect(par.diagnostics.length).toBe(0);
 	});
 
 	test('semicolon comment only returns empty results', () => {
-		const par = new Parser();
-		par.parseLine('   ; line comment', 0);
+		const par = parseLine('   ; line comment', 0);
 		expect(par.diagnostics.length).toBe(0);
 	});
 });
-
-// describe('parseLine: conditional assembly', () => {
-// 	test('#ifdef with symbol ok', () => {
-// 		let results;
-// 		results = parseLine('   #ifdef foo', 0);
-// 		expect(results.diagnostics.length).toBe(0);
-// 		results = parseLine('#ifdef SYMBOL_NAME    ; with a line comment', 0);
-// 		expect(results.diagnostics.length).toBe(0);
-// 	});
-// 	test('#ifdef missing symbol', () => {
-// 		let results;
-// 		results = parseLine('#ifdef', 0);
-// 		expect(results.diagnostics.length).toBe(1);
-// 		expect(results.diagnostics[0].message).toEqual(
-// 			'Missing symbol for #ifdef');
-// 		expect(results.diagnostics[0].range.start.character).toBe(0);
-// 		expect(results.diagnostics[0].range.end.character).toBe(6);
-
-// 		results = parseLine('#ifdef   ; comment', 0);
-// 		expect(results.diagnostics.length).toBe(1);
-// 		expect(results.diagnostics[0].message).toEqual(
-// 			'Missing symbol for #ifdef');
-// 		expect(results.diagnostics[0].range.start.character).toBe(0);
-// 		expect(results.diagnostics[0].range.end.character).toBe(6);
-// 	});
-// 	test('#ifdef unexpected characters', () => {
-// 		const results = parseLine('#ifdef SYMBOL_NAME other  ; comment', 0);
-// 		expect(results.diagnostics.length).toBe(1);
-// 		expect(results.diagnostics[0].message).toEqual(
-// 			'Unexpected characters after #ifdef');
-// 		expect(results.diagnostics[0].range.start.character).toBe(18);
-// 		expect(results.diagnostics[0].range.end.character).toBe(18);
-// 	});
-
-// 	test('#else ok', () => {
-// 		let results;
-// 		results = parseLine('   #else', 0);
-// 		expect(results.diagnostics.length).toBe(0);
-// 		results = parseLine('#else    ; with a line comment', 0);
-// 		expect(results.diagnostics.length).toBe(0);
-// 	});
-// 	test('#else error', () => {
-// 		const results = parseLine('#else err', 0);
-// 		expect(results.diagnostics.length).toBe(1);
-// 		expect(results.diagnostics[0].message).toEqual(
-// 			'#else must appear alone on the line');
-// 		expect(results.diagnostics[0].range.start.character).toBe(0);
-// 		expect(results.diagnostics[0].range.end.character).toBe(5);
-// 	});
-
-// 	test('#endif ok', () => {
-// 		let results;
-// 		results = parseLine('   #endif', 0);
-// 		expect(results.diagnostics.length).toBe(0);
-// 		results = parseLine('#endif    ; with a line comment', 0);
-// 		expect(results.diagnostics.length).toBe(0);
-// 	});
-// 	test('#endif error', () => {
-// 		const results = parseLine('#endif err', 0);
-// 		expect(results.diagnostics.length).toBe(1);
-// 		expect(results.diagnostics[0].message).toEqual(
-// 			'#endif must appear alone on the line');
-// 		expect(results.diagnostics[0].range.start.character).toBe(0);
-// 		expect(results.diagnostics[0].range.end.character).toBe(6);
-// 	});
-
-// 	test('#error ok', () => {
-// 		for (const s of [
-// 			'#error some text',
-// 			'   #error         ; comment',
-// 			'#error'
-// 		]) {
-// 			const results = parseLine(s, 0);
-// 			expect(results.diagnostics.length).toBe(0);
-// 		}
-// 	});
-
-// 	test('Unrecognized conditional directive', () => {
-// 		const results = parseLine('#unrecognized', 0);
-// 		expect(results.diagnostics.length).toBe(1);
-// 		expect(results.diagnostics[0].message).toEqual(
-// 			'Unrecognized assembler directive');
-// 		expect(results.diagnostics[0].range.start.character).toBe(0);
-// 		expect(results.diagnostics[0].range.end.character).toBe(1);
-// 	});
-// });
-
-// describe('parseLine: macros', () => {
-// 	test('endmac ok', () => {
-// 		let results;
-// 		results = parseLine('    endmac', 0);
-// 		expect(results.diagnostics.length).toBe(0);
-// 		results = parseLine('endmac    ; with a line comment', 0);
-// 		expect(results.diagnostics.length).toBe(0);
-// 	});
-// 	test('endmac error', () => {
-// 		const results = parseLine('    endmac err', 0);
-// 		expect(results.diagnostics.length).toBe(1);
-// 		expect(results.diagnostics[0].message).toEqual(
-// 			'endmac must appear alone on the line');
-// 		expect(results.diagnostics[0].range.start.character).toBe(4);
-// 		expect(results.diagnostics[0].range.end.character).toBe(10);
-// 	});
-// });
 
 describe('parseBsa', () => {
 	test('empty string returns empty results', () => {

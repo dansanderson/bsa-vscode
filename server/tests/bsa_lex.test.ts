@@ -484,4 +484,18 @@ describe('lexLine', () => {
 		expect(results.diagnostics.length).toBe(1);
 		expect(results.tokens.length).toBe(0);
 	});
+
+	test('one label', () => {
+		const results = lexLine('sym', 7);
+		expect(results.tokens.length).toBe(1);
+		expect(results.tokens[0].type).toBe(TokenType.Name);
+	});
+
+	test('one label with colon', () => {
+		const results = lexLine('sym:', 7);
+		expect(results.tokens.length).toBe(2);
+		expect(results.tokens[0].type).toBe(TokenType.Name);
+		expect(results.tokens[1].type).toBe(TokenType.Operator);
+	});
+
 });

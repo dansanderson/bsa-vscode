@@ -79,7 +79,7 @@ const operators = [
 const operatorPatterns: Array<KeywordPattern> = operators.map((kw) => {
 	return {
 		keyword: kw,
-		pat: RegExp(escapeForRegExp(kw) + '\\b', 'iy')
+		pat: RegExp(escapeForRegExp(kw), 'y')
 	};
 });
 
@@ -106,18 +106,20 @@ export interface Token {
 	normText?: string
 }
 
+export interface LexerResult {
+	tokens: Array<Token>;
+	diagnostics: Array<Diagnostic>;
+}
+
 export class Lexer {
-	public text: string;
-	public lineNumber: number;
 	public start: number = 0;
 	public end: number = 0;
 	public tokens: Array<Token> = [];
 	public diagnostics: Array<Diagnostic> = [];
 
-	constructor(text: string, lineNumber: number) {
-		this.text = text;
-		this.lineNumber = lineNumber;
-	}
+	constructor(
+		public text: string,
+		public lineNumber: number) {}
 
 	match(pat: RegExp) {
 		assert (pat.flags.includes('y'));
@@ -273,7 +275,7 @@ export class Lexer {
 	}
 }
 
-export function lexLine(text: string, lineNumber: number): Lexer {
+export function lexLine(text: string, lineNumber: number): LexerResult {
 	let results: Lexer = new Lexer(text, lineNumber);
 
 	results = results.startLex().lexStarComment();
@@ -292,5 +294,8 @@ export function lexLine(text: string, lineNumber: number): Lexer {
 		}
 	}
 
-	return results;
+	return {
+		tokens: results.tokens,
+		diagnostics: results.diagnostics
+	};
 }
