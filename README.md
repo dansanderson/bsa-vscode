@@ -22,7 +22,7 @@ Intended features:
 
 ## Installing the extension
 
-First, download the `.vsix` package of a release of this extension. Then install it:
+First, [download the `.vsix` package release](https://github.com/dansanderson/bsa-vscode/releases/). Then install it:
 
 1. Go to the Extensions view.
 2. Click the **...** dropdown menu.
