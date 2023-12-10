@@ -378,6 +378,18 @@ describe('Lexer lexName', () => {
 		expect(lex.tokens[0].normText).toEqual('loop');
 	});
 
+	test('matches label starting with underscore', () => {
+		const lex = new Lexer(' _loop:', 7);
+		lex.startLex().lexName();
+		expect(lex.isActive()).toBe(false);
+		expect(lex.isDone()).toBe(false);
+		expect(lex.tokens.length).toBe(1);
+		expect(lex.tokens[0].type).toBe(TokenType.Name);
+		expect(lex.tokens[0].start).toBe(1);
+		expect(lex.tokens[0].end).toBe(6);
+		expect(lex.tokens[0].normText).toEqual('_loop');
+	});
+
 	test('matches label with numbers and dots', () => {
 		const lex = new Lexer(' L12.34:', 7);
 		lex.startLex().lexName();

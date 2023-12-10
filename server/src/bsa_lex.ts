@@ -19,7 +19,8 @@ const keywords = [
 	'.word', '.bigw', '.hex4', '.dec4', '.wor', '.byte', '.byt', '.pet',
 	'.disp', '.bhex', '.lits', '.quad', '.real', '.real4', '.fill', '.bss',
 	'.store', '.cpu', '.base', '.org', '.load', '.include', '.size', '.ski',
-	'.pag', '.nam', '.subttl', '.end', '.case', '!src', '!addr'
+	'.pag', '.nam', '.subttl', '.end', '.case', '!src', '!addr',
+	'module'
 ];
 
 const opcodes = [
@@ -51,7 +52,11 @@ const opcodes = [
 	// 65802 and 65816 instructions supported by BSA
 	'phd', 'tcs', 'pld', 'tsa', 'tsc', 'wdm', 'mvp', 'phk', 'mvn',
     'tcd', 'rtl', 'tdc', 'phb', 'plb', 'tyx', 'wai', 'stp', 'swa',
-    'xba', 'xce'
+    'xba', 'xce',
+
+	// "L" long versions of branch instructions for 45GS02
+	'lbpl', 'lbmi', 'lbvc', 'lbvs', 'lbcc', 'lbcs', 'lbne', 'lbeq',
+	'lbra', 'lbru', 'lbsr'
 ];
 
 const opcodePatterns: Array<KeywordPattern> = opcodes.map((kw) => {
@@ -100,9 +105,9 @@ export class Lexer {
 
 	// These Regexps use "sticky" mode and have state, so they need to be recompiled per Lexer instance.
 	private spacePattern = /\s*/y;
-	private namePattern = /(\*|&|(\p{Letter}[\w.]*)|(\d+\$))/uy;
+	private namePattern = /(\*|&|([\p{Letter}_][\w.]*)|(\d+\$))/uy;
 	private starCommentPattern = /\s*\*(?!\s*=).*/y;
-	private numberPattern = /((\$[0-9a-f]+)|(%[01]+)|([0-9]+\.[0-9]*)|(\.[0-9]+)|([0-9]+))/iy;
+	private numberPattern = /((\$[0-9a-f]+)|(%[01]+)|(@[0-7]+)|([0-9]+\.[0-9]*)|(\.[0-9]+)|([0-9]+))/iy;
 	private operatorPatterns: Array<KeywordPattern>;
 	private keywordPatterns: Array<KeywordPattern>;
 
