@@ -16,6 +16,8 @@ import {
 	TextDocument
 } from 'vscode-languageserver-textdocument';
 
+import { Token } from './bsa_lex';
+
 import {
 	ParserResult,
 	parseBsa
@@ -52,7 +54,7 @@ connection.onInitialize((params: InitializeParams) => {
 	const result: InitializeResult = {
 		capabilities: {
 			textDocumentSync: TextDocumentSyncKind.Incremental,
-			// definitionProvider: true,
+			definitionProvider: true,
 			// referencesProvider: true,
 			// documentSymbolProvider: true,
 			// documentHighlightProvider: true,
@@ -95,20 +97,44 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 	});
 }
 
-// TODO: Go To Definition
-connection.onDefinition((request: DefinitionParams) => {
-	// request.textDocument.uri
-	// request.position.character
-	// request.position.line
+function findDefinitionForUse(
+		usesByLine: Map<number, Array<Token>>,
+		definitions: Token[],
+		lineNumber: number,
+		charPos: number): Token | undefined {
+	const usesForLine = usesByLine.get(lineNumber);
+	if (!usesForLine) return undefined;
+	const useToken = usesForLine.find(useToken => charPos >= useToken.start && charPos <= useToken.end);
+	if (!useToken) return undefined;
+	return definitions.find(defToken => defToken.normText === useToken.normText);
+}
 
-	// return null;
-	return {
-		uri: request.textDocument.uri,
-		range: {
-			start: { line: 0, character: 0 },
-			end: { line: 0, character: 1 }
-		}
-	};
+connection.onDefinition((request: DefinitionParams) => {
+	const parseResult = documentParseResults.get(request.textDocument.uri);
+	if (!parseResult) return null;
+
+	const defToken: Token | undefined = (
+		findDefinitionForUse(
+			parseResult.symbolUsesByLine,
+			parseResult.symbolDefinitions,
+			request.position.line,
+			request.position.character) ||
+		findDefinitionForUse(
+			parseResult.macroUsesByLine,
+			parseResult.macroDefinitions,
+			request.position.line,
+			request.position.character));
+
+	if (defToken) {
+		return {
+			uri: request.textDocument.uri,
+			range: {
+				start: { line: defToken.lineNumber, character: defToken.start },
+				end: { line: defToken.lineNumber, character: defToken.end }
+			}
+		};
+	}
+	return null;
 });
 
 // TODO: Find All References

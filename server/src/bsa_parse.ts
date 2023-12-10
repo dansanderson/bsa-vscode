@@ -39,16 +39,42 @@ export interface ParserResult {
 	diagnostics: Diagnostic[];
 	symbolDefinitions: Token[];
 	symbolUses: Map<string, Array<Token>>;
+	symbolUsesByLine: Map<number, Array<Token>>;
 	macroDefinitions: Token[];
 	macroUses: Map<string, Array<Token>>;
+	macroUsesByLine: Map<number, Array<Token>>;
+}
+
+export function addToMapOfList<K,V>(mapOfList: Map<K, Array<V>>, key: K, value: V) {
+	if (!key) return;
+	if (!mapOfList.has(key)) {
+		mapOfList.set(key, [value]);
+	} else {
+		mapOfList.get(key)?.push(value);
+	}
+}
+
+export function mergeMapOfListLeft<K,V>(first: Map<K, Array<V>>, second: Map<K, Array<V>>) {
+	second.forEach((v,k) => {
+		if (!first.has(k)) {
+			first.set(k, v.slice());
+		} else {
+			first.set(k, first.get(k)?.concat(v) || []);
+		}
+	});
+	return first;
 }
 
 export function mergeParserResultsLeft(first: ParserResult, second: ParserResult): ParserResult {
 	first.diagnostics = first.diagnostics.concat(second.diagnostics);
 	first.symbolDefinitions = first.symbolDefinitions.concat(second.symbolDefinitions);
 	first.macroDefinitions = first.macroDefinitions.concat(second.macroDefinitions);
-	second.symbolUses.forEach((v, k) => { first.symbolUses.set(k, v); });
-	second.macroUses.forEach((v, k) => { first.macroUses.set(k, v); });
+
+	mergeMapOfListLeft(first.symbolUses, second.symbolUses);
+	mergeMapOfListLeft(first.symbolUsesByLine, second.symbolUsesByLine);
+	mergeMapOfListLeft(first.macroUses, second.macroUses);
+	mergeMapOfListLeft(first.macroUsesByLine, second.macroUsesByLine);
+
 	return first;
 }
 
@@ -56,8 +82,10 @@ export class Parser {
 	diagnostics: Diagnostic[] = [];
 	symbolDefinitions: Token[] = [];
 	symbolUses: Map<string, Array<Token>> = new Map();
+	symbolUsesByLine: Map<number, Array<Token>> = new Map();
 	macroDefinitions: Token[] = [];
 	macroUses: Map<string, Array<Token>> = new Map();
+	macroUsesByLine: Map<number, Array<Token>> = new Map();
 	pos: number = 0;
 	lex: LexerResult;
 
@@ -83,12 +111,14 @@ export class Parser {
 		this.addDiagnosticForTokenRange(message, severity, token, token);
 	}
 
-	addUse(tokMap: Map<string, Array<Token>>, tok: Token) {
-		if (!tok.normText) return;
-		if (!tokMap.has(tok.normText)) {
-			tokMap.set(tok.normText, []);
-		}
-		tokMap.get(tok.normText)?.push(tok);
+	addSymbolUse(tok: Token) {
+		addToMapOfList(this.symbolUses, tok.normText, tok);
+		addToMapOfList(this.symbolUsesByLine, tok.lineNumber, tok);
+	}
+
+	addMacroUse(tok: Token) {
+		addToMapOfList(this.macroUses, tok.normText, tok);
+		addToMapOfList(this.macroUsesByLine, tok.lineNumber, tok);
 	}
 
 	startParse() {
@@ -201,7 +231,7 @@ export class Parser {
 		} else {
 			if (this.lex.tokens[this.pos].type === TokenType.Name &&
 					!this.isLocalLabel(this.lex.tokens[this.pos])) {
-				this.addUse(this.symbolUses, this.lex.tokens[this.pos]);
+				this.addSymbolUse(this.lex.tokens[this.pos]);
 			}
 			this.pos++;
 		}
@@ -302,7 +332,7 @@ export class Parser {
 			const nameTok = this.expectToken(TokenType.Name);
 			if (nameTok) {
 				if (!this.isLocalLabel(nameTok))
-					this.addUse(this.symbolUses, nameTok);
+					this.addSymbolUse(nameTok);
 				if (this.pos < this.lex.tokens.length && this.lex.tokens[this.pos].type !== TokenType.RestOfLine) {
 					this.addDiagnosticForToken(
 						'Unexpected text after #ifdef',
@@ -466,7 +496,7 @@ export class Parser {
 						'Unexpected text after macro call',
 						DiagnosticSeverity.Error, this.lex.tokens[this.pos]);
 				} else {
-					this.addUse(this.macroUses, macroUseTok);
+					this.addMacroUse(macroUseTok);
 				}
 			}
 		}
@@ -609,8 +639,10 @@ export function parseLine(text: string, lineNumber: number): ParserResult {
 		diagnostics: par.diagnostics,
 		symbolDefinitions: par.symbolDefinitions,
 		symbolUses: par.symbolUses,
+		symbolUsesByLine: par.symbolUsesByLine,
 		macroDefinitions: par.macroDefinitions,
-		macroUses: par.macroUses
+		macroUses: par.macroUses,
+		macroUsesByLine: par.macroUsesByLine
 	};
 }
 

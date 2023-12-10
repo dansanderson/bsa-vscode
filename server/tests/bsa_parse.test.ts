@@ -1,6 +1,6 @@
 import { expect } from '@jest/globals';
 
-import { Parser, parseLine, parseBsa } from '../src/bsa_parse';
+import { addToMapOfList, mergeMapOfListLeft, Parser, parseLine, parseBsa } from '../src/bsa_parse';
 import { DiagnosticSeverity } from 'vscode-languageserver';
 import { Token, TokenType } from '../src/bsa_lex';
 
@@ -35,30 +35,79 @@ describe('Parser diagnostics', () => {
 	});
 });
 
-describe('Parser addUse', () => {
-	test('new entry', () => {
-		const par = new Parser('', 7);
-		const tokMap = new Map();
-		const tok: Token = { type: TokenType.Keyword, lineNumber: 7, start: 3, end: 5, normText: 'test' };
-		expect(tokMap.get('test')).toBeUndefined();
-		par.addUse(tokMap, tok);
-		expect(tokMap.get('test')?.length).toBe(1);
-		expect(tokMap.get('test')?.[0].normText).toEqual('test');
-		expect(tokMap.get('test')?.[0].type).toEqual(TokenType.Keyword);
+describe('Parser addToMapOfList', () => {
+	test('add to empty entry', () => {
+		const mapOfList = new Map();
+		addToMapOfList(mapOfList, "myKey", "myValue");
+		expect(mapOfList.has("myKey")).toBe(true);
+		expect(mapOfList.get("myKey")?.[0]).toEqual("myValue");
 	});
 
-	test('existing entry', () => {
-		const par = new Parser('', 7);
-		const tokMap = new Map();
-		const tok1: Token = { type: TokenType.Keyword, lineNumber: 7, start: 3, end: 5, normText: 'test' };
-		const tok2: Token = { type: TokenType.Keyword, lineNumber: 7, start: 8, end: 11, normText: 'test' };
-		tokMap.set('test', [tok1]);
-		par.addUse(tokMap, tok2);
-		expect(tokMap.get('test')?.length).toBe(2);
-		expect(tokMap.get('test')?.[1].normText).toEqual('test');
-		expect(tokMap.get('test')?.[1].type).toBe(TokenType.Keyword);
-		expect(tokMap.get('test')?.[0].end).toBe(5);
-		expect(tokMap.get('test')?.[1].end).toBe(11);
+	test('add to existing entry', () => {
+		const mapOfList = new Map();
+		addToMapOfList(mapOfList, "myKey", "myValue");
+		addToMapOfList(mapOfList, "myKey", "myOtherValue");
+		expect(mapOfList.has("myKey")).toBe(true);
+		expect(mapOfList.get("myKey")?.[1]).toEqual("myOtherValue");
+	});
+
+	test('false-y key does nothing', () => {
+		const mapOfList = new Map();
+		addToMapOfList(mapOfList, "myKey", "myValue");
+		expect(mapOfList.size).toBe(1);
+		expect(mapOfList.has("myKey")).toBe(true);
+		expect(mapOfList.get("myKey")?.length).toBe(1);
+		addToMapOfList(mapOfList, undefined, "myValue");
+		expect(mapOfList.size).toBe(1);
+		expect(mapOfList.has("myKey")).toBe(true);
+		expect(mapOfList.get("myKey")?.length).toBe(1);
+	});
+});
+
+describe('Parser mergeMapOfListLeft', () => {
+	test('first and second with same keys', () => {
+		const first = new Map();
+		const second = new Map();
+		addToMapOfList(first, "key1", "value1");
+		addToMapOfList(second, "key1", "value2");
+		mergeMapOfListLeft(first, second);
+		expect(first.size).toBe(1);
+		expect(first.has("key1")).toBe(true);
+		expect(first.get("key1")?.length).toBe(2);
+		expect(first.get("key1")?.[0]).toEqual("value1");
+		expect(first.get("key1")?.[1]).toEqual("value2");
+	});
+
+	test('first and second with different keys', () => {
+		const first = new Map();
+		const second = new Map();
+		addToMapOfList(first, "key1", "value1");
+		addToMapOfList(second, "key2", "value2");
+		mergeMapOfListLeft(first, second);
+		expect(first.size).toBe(2);
+		expect(first.has("key1")).toBe(true);
+		expect(first.get("key1")?.length).toBe(1);
+		expect(first.get("key1")?.[0]).toEqual("value1");
+		expect(first.has("key2")).toBe(true);
+		expect(first.get("key2")?.length).toBe(1);
+		expect(first.get("key2")?.[0]).toEqual("value2");
+	});
+
+	test('first and second with both same and different keys', () => {
+		const first = new Map();
+		const second = new Map();
+		addToMapOfList(first, "key1", "value1");
+		addToMapOfList(second, "key1", "value2");
+		addToMapOfList(second, "key2", "value3");
+		mergeMapOfListLeft(first, second);
+		expect(first.size).toBe(2);
+		expect(first.has("key1")).toBe(true);
+		expect(first.get("key1")?.length).toBe(2);
+		expect(first.get("key1")?.[0]).toEqual("value1");
+		expect(first.get("key1")?.[1]).toEqual("value2");
+		expect(first.has("key2")).toBe(true);
+		expect(first.get("key2")?.length).toBe(1);
+		expect(first.get("key2")?.[0]).toEqual("value3");
 	});
 });
 
