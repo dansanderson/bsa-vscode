@@ -480,15 +480,95 @@ export class Parser {
 		const opcodeTok = this.expectToken(TokenType.Opcode);
 		if (!opcodeTok) return this;
 
-		// TODO: expect addressing expression
-		//   '#' {expr}
-		//   {expr}
-		//   {expr} ',' [xyz]
-		//   '(' {expr} ')' ',' [xyz]
-		//   '(' {expr} ',' [xy] ')'
-		//   '(' {expr} ')'
-		//   '[' {expr} ']' ',z'
-		//   '[' {expr} ']'
+		const firstTok = this.lex.tokens[this.pos];
+		if (this.expectTokenWithText(TokenType.Operator, '#')) {
+			// '#' {expr}
+			if (!this.expectExpression(0)) {
+				this.addDiagnosticForToken(
+					'Invalid expression for immediate',
+					DiagnosticSeverity.Error, firstTok);
+			}
+
+		} else if (this.expectTokenWithText(TokenType.Operator, '(') ||
+				this.expectTokenWithText(TokenType.Operator, '[')) {
+			// '(' {expr} ')' ',' [xyz]
+			// '(' {expr} ',' [xy|sp] ')'
+			// '(' {expr} ')'
+			// '[' {expr} ']' ',z'
+			// '[' {expr} ']'
+			const isParen = firstTok.normText === '(';
+			if (!this.expectExpression(0)) {
+				this.addDiagnosticForToken(
+					'Invalid expression for indirect',
+					DiagnosticSeverity.Error, firstTok);
+			}
+			if (isParen) {
+				if (this.expectTokenWithText(TokenType.Operator, ',')) {
+					const xyOp = this.expectToken(TokenType.Name);
+					if (!xyOp ||
+							(xyOp.normText?.toLowerCase() !== 'x' &&
+							xyOp.normText?.toLowerCase() !== 'y' &&
+							xyOp.normText?.toLowerCase() !== 'sp')) {
+						this.addDiagnosticForToken(
+							'Invalid indirect index register',
+							DiagnosticSeverity.Error, firstTok);
+					}
+				}
+				if (!this.expectTokenWithText(TokenType.Operator, ')')) {
+					this.addDiagnosticForToken(
+						'Expected )',
+						DiagnosticSeverity.Error, this.lex.tokens[this.pos-1]);
+				} else {
+					if (this.expectTokenWithText(TokenType.Operator, ',')) {
+						const xyOp = this.expectToken(TokenType.Name);
+						if (!xyOp ||
+								(xyOp.normText?.toLowerCase() !== 'x' &&
+								xyOp.normText?.toLowerCase() !== 'y' &&
+								xyOp.normText?.toLowerCase() !== 'z')) {
+							this.addDiagnosticForToken(
+								'Invalid index indirect register',
+								DiagnosticSeverity.Error, firstTok);
+						}
+					}
+				}
+			} else {
+				if (!this.expectTokenWithText(TokenType.Operator, ']')) {
+					this.addDiagnosticForToken(
+						'Expected ]',
+						DiagnosticSeverity.Error, this.lex.tokens[this.pos-1]);
+				} else {
+					if (this.expectTokenWithText(TokenType.Operator, ',')) {
+						const xyOp = this.expectToken(TokenType.Name);
+						if (!xyOp || xyOp.normText?.toLowerCase() !== 'z') {
+							this.addDiagnosticForToken(
+								'Invalid index indirect register',
+								DiagnosticSeverity.Error, firstTok);
+						}
+					}
+				}
+			}
+
+		} else {
+			// {expr}
+			// {expr} ',' [xyz]
+			if (!this.expectExpression(0)) {
+				this.addDiagnosticForToken(
+					'Invalid address expression for opcode',
+					DiagnosticSeverity.Error, firstTok);
+			} else {
+				if (this.expectTokenWithText(TokenType.Operator, ',')) {
+					const xyOp = this.expectToken(TokenType.Name);
+					if (!xyOp ||
+							(xyOp.normText?.toLowerCase() !== 'x' &&
+							xyOp.normText?.toLowerCase() !== 'y' &&
+							xyOp.normText?.toLowerCase() !== 'z')) {
+						this.addDiagnosticForToken(
+							'Invalid index register',
+							DiagnosticSeverity.Error, firstTok);
+					}
+				}
+			}
+		}
 
 		this.pos = this.lex.tokens.length;
 		return this;

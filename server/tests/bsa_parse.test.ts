@@ -697,8 +697,138 @@ describe('parseMacroUse', () => {
 	});
 });
 
-// TODO: parsePseudoOp
-// TODO: parseOpcode
+describe('parsePseudoOp', () => {
+	const VALID_PSEUDOOPS = [
+		'.CPU  45GS02',
+		'.ORG  $E000',
+		'.LOAD $0401',
+		'.STORE BASIC_ROM,$2000,"basic.rom"',
+		'.BYTE $20,"Example",0',
+		'.BHEX 20,1f,33,af',
+		'.WORD LAB_10, WriteTape,$0200',
+		'.BIGW LAB_10, WriteTape,$0200',
+		'.QUAD 100000',
+		'.REAL  3.1415926',
+		'.REAL4 3.1415926',
+		'.BYTE <"BRK"',
+		'.FILL  N ($EA)',
+		'.FILL  $A000 - * (0)',
+		'.INCLUDE "filename"',
+		'.END',
+		'.CASE -',
+		'.BSS 2'
+	];
+
+	VALID_PSEUDOOPS.forEach(valid => {
+		test('valid: ' + valid, () => {
+			const par = new Parser(valid, 7);
+			par.startParse().parsePseudoOp();
+			expect(par.isDone()).toBe(true);
+			expect(par.diagnostics.length).toBe(0);
+		});
+	});
+
+	// test('', () => {
+	// 	const par = new Parser('', 7);
+	// 	par.startParse().parsePseudoOp();
+	// 	expect(par.isDone()).toBe(true);
+	// 	expect(par.diagnostics.length).toBe(1);
+	// });
+});
+
+describe('parseOpcode', () => {
+	const VALID_OPS = [
+		'lda #7',
+		'lda $8a',
+		'lda 53280',
+		'lda $8a,x',
+		'lda $d020,y',
+		'lda ($8a,x)',
+		'lda ($8a),y',
+		'lda ($8a),z',
+		'lda (99,sp),y',
+		'lda [$fc],z'
+	];
+
+	VALID_OPS.forEach(valid => {
+		test('valid: ' + valid, () => {
+			const par = new Parser(valid, 7);
+			par.startParse().parseOpcode();
+			expect(par.isDone()).toBe(true);
+			expect(par.diagnostics.length).toBe(0);
+		});
+	});
+
+	test('immediate missing expression', () => {
+		const par = new Parser('lda #', 7);
+		par.startParse().parseOpcode();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics[0]?.message).toContain('Invalid expression for immediate');
+	});
+
+	test('indirect missing expression', () => {
+		const par = new Parser('lda (),x', 7);
+		par.startParse().parseOpcode();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics[1]?.message).toContain('Invalid expression for indirect');
+	});
+
+	test('indirect invalid register', () => {
+		const par = new Parser('lda ($7a,a)', 7);
+		par.startParse().parseOpcode();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics[0]?.message).toContain('Invalid indirect index register');
+	});
+
+	test('missing indirect closing paren', () => {
+		const par = new Parser('lda ($7a,x', 7);
+		par.startParse().parseOpcode();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics[0]?.message).toContain('Expected )');
+	});
+
+	test('missing indirect register', () => {
+		const par = new Parser('lda ($7a),', 7);
+		par.startParse().parseOpcode();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics[0]?.message).toContain('Invalid index indirect register');
+	});
+
+	test('incorrect indirect register', () => {
+		const par = new Parser('lda ($7a),a', 7);
+		par.startParse().parseOpcode();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics[0]?.message).toContain('Invalid index indirect register');
+	});
+
+	test('missing quad indirect closing bracket', () => {
+		const par = new Parser('lda [$7a', 7);
+		par.startParse().parseOpcode();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics[0]?.message).toContain('Expected ]');
+	});
+
+	test('quad indirect incorrect register', () => {
+		const par = new Parser('lda [$7a],y', 7);
+		par.startParse().parseOpcode();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics[0]?.message).toContain('Invalid index indirect register');
+	});
+
+	test('invalid address expression', () => {
+		const par = new Parser('lda ,y', 7);
+		par.startParse().parseOpcode();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics[0]?.message).toContain('Invalid address expression for opcode');
+	});
+
+	test('invalid index register', () => {
+		const par = new Parser('lda foo,a', 7);
+		par.startParse().parseOpcode();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics[0]?.message).toContain('Invalid index register');
+	});
+});
 
 describe('parseLine: empty and comments', () => {
 	test('empty string returns empty results', () => {
