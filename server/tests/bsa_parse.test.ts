@@ -566,7 +566,139 @@ describe('parseAssignment', () => {
 	});
 });
 
-// TODO: parseMacroUse
+describe('parseLabel', () => {
+	test('empty line', () => {
+		const par = new Parser('', 7);
+		par.startParse().parseLabel();
+		expect(par.pos).toBe(0);
+		expect(par.symbolDefinitions.length).toBe(0);
+	});
+
+	test('label only', () => {
+		const par = new Parser('foo', 7);
+		par.startParse().parseLabel();
+		expect(par.pos).toBe(1);
+		expect(par.symbolDefinitions.length).toBe(1);
+	});
+
+	test('label with colon only', () => {
+		const par = new Parser('foo:', 7);
+		par.startParse().parseLabel();
+		expect(par.pos).toBe(2);
+		expect(par.symbolDefinitions.length).toBe(1);
+	});
+
+	test('macro call only', () => {
+		const par = new Parser('foo()', 7);
+		par.startParse().parseLabel();
+		expect(par.pos).toBe(0);
+		expect(par.symbolDefinitions.length).toBe(0);
+	});
+
+	test('opcode only', () => {
+		const par = new Parser('lda #7', 7);
+		par.startParse().parseLabel();
+		expect(par.pos).toBe(0);
+		expect(par.symbolDefinitions.length).toBe(0);
+	});
+
+	test('pseudo-op only', () => {
+		const par = new Parser('.word 0', 7);
+		par.startParse().parseLabel();
+		expect(par.pos).toBe(0);
+		expect(par.symbolDefinitions.length).toBe(0);
+	});
+
+	test('label and macro call', () => {
+		const par = new Parser('foo bar()', 7);
+		par.startParse().parseLabel();
+		expect(par.pos).toBe(1);
+		expect(par.symbolDefinitions.length).toBe(1);
+	});
+
+	test('label, colon, and macro call', () => {
+		const par = new Parser('foo: bar()', 7);
+		par.startParse().parseLabel();
+		expect(par.pos).toBe(2);
+		expect(par.symbolDefinitions.length).toBe(1);
+	});
+});
+
+describe('parseMacroUse', () => {
+	test('non-macro use', () => {
+		const par = new Parser('lda #7', 7);
+		par.startParse().parseMacroUse();
+		expect(par.pos).toBe(0);
+		expect(par.macroUses.has('lda')).toBe(false);
+	});
+
+	test('zero args', () => {
+		const par = new Parser('foo()', 7);
+		par.startParse().parseMacroUse();
+		expect(par.isDone()).toBe(true);
+		expect(par.macroUses.has('foo')).toBe(true);
+	});
+
+	test('one simple arg', () => {
+		const par = new Parser('foo(7)', 7);
+		par.startParse().parseMacroUse();
+		expect(par.isDone()).toBe(true);
+		expect(par.macroUses.has('foo')).toBe(true);
+	});
+
+	test('one complex arg', () => {
+		const par = new Parser('foo(<(sym999 / $123a))', 7);
+		par.startParse().parseMacroUse();
+		expect(par.isDone()).toBe(true);
+		expect(par.macroUses.has('foo')).toBe(true);
+	});
+
+	test('three args', () => {
+		const par = new Parser('foo(123, abc, $bd00-%0100)', 7);
+		par.startParse().parseMacroUse();
+		expect(par.isDone()).toBe(true);
+		expect(par.macroUses.has('foo')).toBe(true);
+	});
+
+	test('name without parens', () => {
+		const par = new Parser('foo', 7);
+		par.startParse().parseMacroUse();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics[0]?.message).toContain('Unexpected name');
+	});
+
+	test('missing closing paren', () => {
+		const par = new Parser('foo(', 7);
+		par.startParse().parseMacroUse();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics[0]?.message).toContain('Expected , or )');
+	});
+
+	test('missing comma', () => {
+		const par = new Parser('foo(1 2)', 7);
+		par.startParse().parseMacroUse();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics[0]?.message).toContain('Expected , or )');
+	});
+
+	test('invalid argument expression', () => {
+		const par = new Parser('foo(2 +)', 7);
+		par.startParse().parseMacroUse();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics.length).toBe(3);
+		expect(par.diagnostics[2]?.message).toContain('Invalid macro argument');
+	});
+
+	test('text after macro call', () => {
+		const par = new Parser('foo() lda #7', 7);
+		par.startParse().parseMacroUse();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics[0]?.message).toContain('Unexpected text');
+	});
+});
+
+// TODO: parsePseudoOp
+// TODO: parseOpcode
 
 describe('parseLine: empty and comments', () => {
 	test('empty string returns empty results', () => {

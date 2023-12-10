@@ -402,36 +402,97 @@ export class Parser {
 	}
 
 	parseLabel() {
-		this.expectLabel();
+		if (this.isDone()) return this;
+
+		// Handle label, disambiguating between labeled line and
+		// unlabeled macro use
+		let labelTok = undefined;
+		if (this.lex.tokens[this.pos]?.type === TokenType.Name) {
+			const secondTok = this.lex.tokens[this.pos+1];
+			if (secondTok?.type !== TokenType.Operator ||
+					secondTok?.normText !== '(') {
+				labelTok = this.expectLabel();
+			}
+		}
+
 		return this;
 	}
 
 	parseMacroUse() {
-		// TODO:
+		if (this.isDone()) return this;
+
+		const macroUseTok = this.expectToken(TokenType.Name);
+		if (!macroUseTok) return this;
+
+		if (!this.expectTokenWithText(TokenType.Operator, '(')) {
+			this.addDiagnosticForToken(
+				'Unexpected name; maybe macro call missing () ?',
+				DiagnosticSeverity.Error, macroUseTok);
+		} else {
+			let sawComma = true;
+			let sawArgumentError = false;
+			while (!this.expectTokenWithText(TokenType.Operator, ')')) {
+				if (this.isDone() || !sawComma) {
+					this.addDiagnosticForToken(
+						'Expected , or )',
+						DiagnosticSeverity.Error, this.lex.tokens[this.pos-1]);
+					sawArgumentError = true;
+					break;
+				}
+				if (!this.expectExpression(0)) {
+					this.addDiagnosticForToken(
+						'Invalid macro argument',
+						DiagnosticSeverity.Error, this.lex.tokens[this.pos-1]);
+					sawArgumentError = true;
+					break;
+				}
+				sawComma = !!this.expectTokenWithText(TokenType.Operator, ',');
+			}
+
+			if (!sawArgumentError) {
+				if (!this.isDone()) {
+					this.addDiagnosticForToken(
+						'Unexpected text after macro call',
+						DiagnosticSeverity.Error, this.lex.tokens[this.pos]);
+				} else {
+					this.addUse(this.macroUses, macroUseTok);
+				}
+			}
+		}
+
+		this.pos = this.lex.tokens.length;
 		return this;
 	}
 
-	// TODO:
-	// - Assignment
-	//    * = {expr}
-	//    & = {expr}
-	//    {sym} = {expr}
-	// - [{sym}:?] {macro-name} '(' [{expr} [',' {expr}...]] ')'
-	//   - record macro use
-	// - [{sym}:?] {pseudo-opcode} {args}
-	// - [{sym}:?] {opcode} {addr-expr}
-	// - [{sym}:?]
-	//   - record label; ignore local labels (\d+\$)
-	//
-	// - addressing mode parsing
-	//   '#' {expr}
-	//   {expr}
-	//   {expr} ',' [xyz]
-	//   '(' {expr} ')' ',' [xyz]
-	//   '(' {expr} ',' [xy] ')'
-	//   '(' {expr} ')'
-	//   '[' {expr} ']' ',z'
-	//   '[' {expr} ']'
+	parsePseudoOp() {
+		if (this.isDone()) return this;
+
+		const keywordTok = this.expectToken(TokenType.Keyword);
+		if (!keywordTok) return this;
+
+		// TODO: parse pseudo-op args
+
+		this.pos = this.lex.tokens.length;
+		return this;
+	}
+
+	parseOpcode() {
+		const opcodeTok = this.expectToken(TokenType.Opcode);
+		if (!opcodeTok) return this;
+
+		// TODO: expect addressing expression
+		//   '#' {expr}
+		//   {expr}
+		//   {expr} ',' [xyz]
+		//   '(' {expr} ')' ',' [xyz]
+		//   '(' {expr} ',' [xy] ')'
+		//   '(' {expr} ')'
+		//   '[' {expr} ']' ',z'
+		//   '[' {expr} ']'
+
+		this.pos = this.lex.tokens.length;
+		return this;
+	}
 }
 
 export function parseLine(text: string, lineNumber: number): ParserResult {
@@ -443,9 +504,11 @@ export function parseLine(text: string, lineNumber: number): ParserResult {
 		.handleUnrecognizedHashDirective()
 		.parseMacroDefinitionStart()
 		.parseAssignment()
-		// Always before other lines that can start with a label:
+		// Always before any line type that can start with a label:
 		.parseLabel()
-		.parseMacroUse();
+		.parseMacroUse()
+		.parsePseudoOp()
+		.parseOpcode();
 	if (!par.isDone()) {
 		par.addDiagnosticForTokenRange(
 			'Syntax error', DiagnosticSeverity.Error,
