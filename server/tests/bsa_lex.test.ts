@@ -315,6 +315,18 @@ describe('Lexer lexOperator', () => {
 		lex.startLex().lexOperator();
 		expect(lex.isActive()).toBe(true);
 	});
+
+	test('matches > operator before name', () => {
+		const lex = new Lexer(' >abc', 7);
+		lex.startLex().lexOperator();
+		expect(lex.isActive()).toBe(false);
+		expect(lex.isDone()).toBe(false);
+		expect(lex.tokens.length).toBe(1);
+		expect(lex.tokens[0].type).toBe(TokenType.Operator);
+		expect(lex.tokens[0].normText).toEqual('>');
+		expect(lex.tokens[0].start).toBe(1);
+		expect(lex.tokens[0].end).toBe(2);
+	});
 });
 
 describe('Lexer lexName', () => {
@@ -496,6 +508,19 @@ describe('lexLine', () => {
 		expect(results.tokens.length).toBe(2);
 		expect(results.tokens[0].type).toBe(TokenType.Name);
 		expect(results.tokens[1].type).toBe(TokenType.Operator);
+	});
+
+	test('one operator', () => {
+		const results = lexLine('=', 7);
+		expect(results.tokens.length).toBe(1);
+		expect(results.tokens[0].type).toBe(TokenType.Operator);
+	});
+
+	test('one operator and one label', () => {
+		const results = lexLine('==abc', 7);
+		expect(results.tokens.length).toBe(2);
+		expect(results.tokens[0].type).toBe(TokenType.Operator);
+		expect(results.tokens[1].type).toBe(TokenType.Name);
 	});
 
 });

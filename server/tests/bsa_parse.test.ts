@@ -126,6 +126,134 @@ describe('expectToken', () => {
 	});
 });
 
+describe('expectExpression', () => {
+	test('false when done', () => {
+		const par = new Parser('  ; line comment', 7);
+		expect(par.startParse().expectExpression()).toBe(false);
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics.length).toBe(0);
+	});
+
+	test('false when comma', () => {
+		const par = new Parser(', xyz', 7);
+		expect(par.startParse().expectExpression()).toBe(false);
+		expect(par.diagnostics.length).toBe(0);
+	});
+
+	test('one symbol ok', () => {
+		const par = new Parser('abc', 7);
+		expect(par.startParse().expectExpression()).toBe(true);
+		expect(par.diagnostics.length).toBe(0);
+		expect(par.isDone()).toBe(true);
+	});
+
+	test('star symbol ok', () => {
+		const par = new Parser('(*)', 7);
+		expect(par.startParse().expectExpression()).toBe(true);
+		expect(par.diagnostics.length).toBe(0);
+		expect(par.isDone()).toBe(true);
+	});
+
+	test('ampersand symbol ok', () => {
+		const par = new Parser('&', 7);
+		expect(par.startParse().expectExpression()).toBe(true);
+		expect(par.diagnostics.length).toBe(0);
+		expect(par.isDone()).toBe(true);
+	});
+
+	test('error empty brakcets', () => {
+		const par = new Parser('()', 7);
+		expect(par.startParse().expectExpression()).toBe(false);
+		expect(par.diagnostics.length).toBe(1);
+	});
+
+	test('error missing closing bracket', () => {
+		const par = new Parser('(abc', 7);
+		expect(par.startParse().expectExpression()).toBe(false);
+		expect(par.diagnostics.length).toBe(1);
+	});
+
+	test('one symbol in brackets ok', () => {
+		const par = new Parser('(abc)', 7);
+		expect(par.startParse().expectExpression()).toBe(true);
+		expect(par.diagnostics.length).toBe(0);
+		expect(par.isDone()).toBe(true);
+	});
+
+	test('one symbol in square brackets ok', () => {
+		const par = new Parser('[abc]', 7);
+		expect(par.startParse().expectExpression()).toBe(true);
+		expect(par.diagnostics.length).toBe(0);
+		expect(par.isDone()).toBe(true);
+	});
+
+	test('error wrong closing bracket', () => {
+		const par = new Parser('(abc]', 7);
+		expect(par.startParse().expectExpression()).toBe(false);
+		expect(par.diagnostics.length).toBe(1);
+	});
+
+	test('unary operator ok', () => {
+		const par = new Parser('<abc', 7);
+		expect(par.startParse().expectExpression()).toBe(true);
+		expect(par.diagnostics.length).toBe(0);
+		expect(par.isDone()).toBe(true);
+	});
+
+	test('unary operator with paren expression ok', () => {
+		const par = new Parser('<(abc)', 7);
+		expect(par.startParse().expectExpression()).toBe(true);
+		expect(par.diagnostics.length).toBe(0);
+		expect(par.isDone()).toBe(true);
+	});
+
+	test('starts with non-unary operator error', () => {
+		const par = new Parser('==abc', 7);
+		expect(par.startParse().expectExpression()).toBe(false);
+		expect(par.diagnostics.length).toBe(1);
+	});
+
+	test('number plus number ok', () => {
+		const par = new Parser('1+2', 7);
+		expect(par.startParse().expectExpression()).toBe(true);
+		expect(par.diagnostics.length).toBe(0);
+		expect(par.isDone()).toBe(true);
+	});
+
+	test('number plus number times number ok', () => {
+		const par = new Parser('1+2*3', 7);
+		expect(par.startParse().expectExpression()).toBe(true);
+		expect(par.diagnostics.length).toBe(0);
+		expect(par.isDone()).toBe(true);
+	});
+
+	test('number times number plus number ok', () => {
+		const par = new Parser('1*2+3', 7);
+		expect(par.startParse().expectExpression()).toBe(true);
+		expect(par.diagnostics.length).toBe(0);
+		expect(par.isDone()).toBe(true);
+	});
+
+	test('complex expression ok', () => {
+		const par = new Parser('<(sym + $c000 >> 2 - %0100) + >sym2', 7);
+		expect(par.startParse().expectExpression()).toBe(true);
+		expect(par.diagnostics.length).toBe(0);
+		expect(par.isDone()).toBe(true);
+	});
+
+	test('complex expression missing last term error', () => {
+		const par = new Parser('<(sym + $c000 >> 2 - %0100) +', 7);
+		expect(par.startParse().expectExpression()).toBe(false);
+		expect(par.diagnostics.length).toBe(1);
+	});
+
+	test('complex expression missing a middle term error', () => {
+		const par = new Parser('<(sym + >> 2 - %0100) + >sym2', 7);
+		expect(par.startParse().expectExpression()).toBe(false);
+		expect(par.diagnostics.length).toBe(2);
+	});
+});
+
 describe('parseSoloTokens', () => {
 	test('does nothing when done', () => {
 		const par = new Parser('  ; line comment', 7);

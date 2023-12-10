@@ -5,6 +5,36 @@ import {
 
 import { LexerResult, lexLine, Token, TokenType } from './bsa_lex';
 
+const unaryOperators = [
+	'+', '-', '!', '~', '<', '>'
+];
+
+const binaryOperators = [
+	'==', '!=', '>=', '<=', '>>', '<<', '&&', '||',
+	'+', '-', '*', '/', '&', '|', '^'
+];
+
+interface OperatorPriorities { [key: string]: number; }
+const binaryOperatorPriorites: OperatorPriorities = {
+	'*': 11,
+	'/': 11,
+	'+': 10,
+	'-': 10,
+	'<<': 9,
+	'>>': 9,
+	'<=': 8,
+	'<': 8,
+	'>=': 8,
+	'>': 8,
+	'==': 7,
+	'!=': 7,
+	'&': 6,
+	'^': 5,
+	'|': 4,
+	'&&': 3,
+	'||': 2
+};
+
 export interface ParserResult {
 	diagnostics: Diagnostic[];
 	symbolDefinitions: Token[];
@@ -85,6 +115,91 @@ export class Parser {
 			return this.lex.tokens[this.pos++];
 		}
 		return undefined;
+	}
+
+	expectExpression(priority: number = 0): boolean {
+		if (this.isDone()) return false;
+
+		const isStarOrAmpersand = (this.lex.tokens[this.pos].type === TokenType.Operator &&
+			(this.lex.tokens[this.pos].normText === '*' ||
+			this.lex.tokens[this.pos].normText === '&'));
+
+		// First token is operator. Comma? Bracket? Unary?
+		if (this.lex.tokens[this.pos].type === TokenType.Operator && !isStarOrAmpersand) {
+			const txt = this.lex.tokens[this.pos].normText;
+
+			// Comma?
+			if (txt === ',') {
+				return false;
+			}
+
+			// Brackets?
+			if (txt === '(' || txt === '[') {
+				this.pos++;
+				const closing = (txt === '(' ? ')' : ']');
+				if (this.expectExpression(0) == false) {
+					return false;
+				}
+				if (this.expectTokenWithText(TokenType.Operator, closing) === undefined) {
+					this.addDiagnosticForToken(
+						'Expected closing bracket: ' + closing,
+						DiagnosticSeverity.Error,
+						this.lex.tokens[this.pos-1]);
+					return false;
+				}
+				// Continue...
+
+			// Unary operator?
+			} else if (unaryOperators.some(op => txt == op)) {
+				this.pos++;
+				if (!this.expectExpression(12)) {
+					return false;
+				}
+				// Continue...
+
+			// Unexpected operator at beginning of expression
+			} else {
+				this.addDiagnosticForToken(
+					'Unexpected operator',
+					DiagnosticSeverity.Error,
+					this.lex.tokens[this.pos]);
+				return false;
+			}
+
+		// First token is not operator. Literal or symbol term OK, otherwise error.
+		} else if (this.lex.tokens[this.pos].type !== TokenType.LiteralNumber &&
+				!isStarOrAmpersand &&
+				this.lex.tokens[this.pos].type !== TokenType.Name) {
+			this.addDiagnosticForToken(
+				'Illegal operand',
+				DiagnosticSeverity.Error,
+				this.lex.tokens[this.pos]);
+			return false;
+
+		} else {
+			this.pos++;
+		}
+
+		// One term has been parsed. Is this part of a binary operator expression?
+		for (;;) {
+			if (this.isDone() ||
+					this.lex.tokens[this.pos].type !== TokenType.Operator ||
+					!binaryOperators.some(op => this.lex.tokens[this.pos].normText == op)) {
+				return true;
+			}
+
+			const opPriority = binaryOperatorPriorites[this.lex.tokens[this.pos].normText || ''];
+			if (opPriority <= priority) return true;
+
+			this.pos++;
+			if (!this.expectExpression(opPriority)) {
+				this.addDiagnosticForToken(
+					'Missing operand',
+					DiagnosticSeverity.Error,
+					this.lex.tokens[this.pos-1]);
+				return false;
+			}
+		}
 	}
 
 	parseSoloTokens() {
