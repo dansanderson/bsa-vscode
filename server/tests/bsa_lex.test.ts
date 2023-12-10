@@ -161,6 +161,13 @@ describe('Lexer lexStarComment', () => {
 		expect(lex.start).toBe(3);
 		expect(lex.end).toBe(3);
 	});
+
+	test('real star comment 2', () => {
+		const lex = new Lexer('*                      //                             *', 1);
+		lex.startLex().lexStarComment();
+		expect(lex.isActive()).toBe(false);
+		expect(lex.isDone()).toBe(true);
+	});
 });
 
 describe('Lexer lexLineComment', () => {
@@ -190,6 +197,7 @@ describe('Lexer lexStringLiteral', () => {
 		expect(lex.end).toBe(11);
 		expect(lex.tokens.length).toBe(1);
 		expect(lex.tokens[0].type).toBe(TokenType.LiteralString);
+		expect(lex.tokens[0].normText).toEqual('string');
 	});
 
 	test('matches single-quoted string with escapes', () => {
@@ -200,6 +208,7 @@ describe('Lexer lexStringLiteral', () => {
 		expect(lex.end).toBe(14);
 		expect(lex.tokens.length).toBe(1);
 		expect(lex.tokens[0].type).toBe(TokenType.LiteralString);
+		expect(lex.tokens[0].normText).toEqual('str\'ing');
 	});
 
 	test('matches double-quoted string', () => {
@@ -210,6 +219,7 @@ describe('Lexer lexStringLiteral', () => {
 		expect(lex.end).toBe(11);
 		expect(lex.tokens.length).toBe(1);
 		expect(lex.tokens[0].type).toBe(TokenType.LiteralString);
+		expect(lex.tokens[0].normText).toEqual('string');
 	});
 
 	test('matches double-quoted string with escapes', () => {
@@ -220,6 +230,7 @@ describe('Lexer lexStringLiteral', () => {
 		expect(lex.end).toBe(14);
 		expect(lex.tokens.length).toBe(1);
 		expect(lex.tokens[0].type).toBe(TokenType.LiteralString);
+		expect(lex.tokens[0].normText).toEqual('str"ing');
 	});
 
 	test('warns of unterminated string literal', () => {
@@ -231,6 +242,7 @@ describe('Lexer lexStringLiteral', () => {
 		expect(lex.diagnostics[0].severity).toBe(DiagnosticSeverity.Warning);
 		expect(lex.tokens.length).toBe(1);
 		expect(lex.tokens[0].type).toBe(TokenType.LiteralString);
+		expect(lex.tokens[0].normText).toEqual('str"ing etc.');
 	});
 });
 

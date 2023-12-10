@@ -291,6 +291,22 @@ describe('expectExpression', () => {
 		expect(par.startParse().expectExpression()).toBe(false);
 		expect(par.diagnostics.length).toBe(2);
 	});
+
+	test('single character string literal treated as number literal ok', () => {
+		// TokenType.LiteralString is not allowed in an expression generally, but
+		// if it contains a single character
+		const par = new Parser('\'X\'', 7);
+		expect(par.startParse().expectExpression()).toBe(true);
+		expect(par.diagnostics.length).toBe(0);
+		expect(par.isDone()).toBe(true);
+	});
+
+	test('single character string literal containing escaped quote ok', () => {
+		const par = new Parser('\'\\\'\'', 7);
+		expect(par.startParse().expectExpression()).toBe(true);
+		expect(par.diagnostics.length).toBe(0);
+		expect(par.isDone()).toBe(true);
+	});
 });
 
 describe('parseSoloTokens', () => {
@@ -747,7 +763,10 @@ describe('parseOpcode', () => {
 		'lda ($8a),y',
 		'lda ($8a),z',
 		'lda (99,sp),y',
-		'lda [$fc],z'
+		'lda [$fc],z',
+		'sec',
+		'bbr0 abc,def',
+		'cmp #\'X\''
 	];
 
 	VALID_OPS.forEach(valid => {
@@ -821,13 +840,6 @@ describe('parseOpcode', () => {
 		expect(par.isDone()).toBe(true);
 		expect(par.diagnostics[0]?.message).toContain('Invalid address expression for opcode');
 	});
-
-	test('invalid index register', () => {
-		const par = new Parser('lda foo,a', 7);
-		par.startParse().parseOpcode();
-		expect(par.isDone()).toBe(true);
-		expect(par.diagnostics[0]?.message).toContain('Invalid index register');
-	});
 });
 
 describe('parseLine: empty and comments', () => {
@@ -862,6 +874,23 @@ describe('parseLine: empty and comments', () => {
 		const par = parseLine('foo   ; some comment', 0);
 		expect(par.diagnostics.length).toBe(0);
 		expect(par.symbolDefinitions[0].normText).toBe('foo');
+	});
+});
+
+describe('parseLine: b65.src examples', () => {
+	test('real star comment 1', () => {
+		const par = parseLine('*******************************************************', 0);
+		expect(par.diagnostics.length).toBe(0);
+	});
+
+	test('real star comment 2', () => {
+		const par = parseLine('*                      //                             *', 1);
+		expect(par.diagnostics.length).toBe(0);
+	});
+
+	test('star assignment with label', () => {
+		const par = parseLine('irq_wrap_flag *=*+1  ;used by BASIC_IRQ to block all but one IRQ call', 0);
+		expect(par.diagnostics.length).toBe(0);
 	});
 
 });

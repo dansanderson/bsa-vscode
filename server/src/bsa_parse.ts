@@ -130,15 +130,25 @@ export class Parser {
 		return tok;
 	}
 
+	isStarOrAmpersand(tok: Token): boolean {
+		return (tok.type === TokenType.Operator &&
+			(tok.normText === '*' ||
+			tok.normText === '&'));
+	}
+
+	isSimpleOperand(tok: Token): boolean {
+		return (tok.type === TokenType.LiteralNumber ||
+			this.isStarOrAmpersand(tok) ||
+			tok.type === TokenType.Name ||
+			(tok.type === TokenType.LiteralString && tok.normText?.length === 1));
+	}
+
 	expectExpression(priority: number = 0): boolean {
 		if (this.isDone()) return false;
 
-		const isStarOrAmpersand = (this.lex.tokens[this.pos].type === TokenType.Operator &&
-			(this.lex.tokens[this.pos].normText === '*' ||
-			this.lex.tokens[this.pos].normText === '&'));
-
 		// First token is operator. Comma? Bracket? Unary?
-		if (this.lex.tokens[this.pos].type === TokenType.Operator && !isStarOrAmpersand) {
+		if (this.lex.tokens[this.pos].type === TokenType.Operator &&
+				!this.isStarOrAmpersand(this.lex.tokens[this.pos])) {
 			const txt = this.lex.tokens[this.pos].normText;
 
 			// Comma?
@@ -180,9 +190,8 @@ export class Parser {
 			}
 
 		// First token is not operator. Literal or symbol term OK, otherwise error.
-		} else if (this.lex.tokens[this.pos].type !== TokenType.LiteralNumber &&
-				!isStarOrAmpersand &&
-				this.lex.tokens[this.pos].type !== TokenType.Name) {
+		// Single character string literal is treated as a number literal.
+		} else if (!this.isSimpleOperand(this.lex.tokens[this.pos])) {
 			this.addDiagnosticForToken(
 				'Illegal operand',
 				DiagnosticSeverity.Error,
@@ -382,6 +391,7 @@ export class Parser {
 
 		const startPos = this.pos;
 		const nameTok = (this.expectToken(TokenType.Name) ||
+			this.expectTokenWithText(TokenType.Operator, '*') ||
 			this.expectTokenWithText(TokenType.Operator, '&'));
 		if (!nameTok) return this;
 		if (!this.expectTokenWithText(TokenType.Operator, '=')) {
@@ -405,12 +415,13 @@ export class Parser {
 		if (this.isDone()) return this;
 
 		// Handle label, disambiguating between labeled line and
-		// unlabeled macro use
+		// unlabeled macro use or assignment.
+		// (Star assignments can be labeled, so label is consumed before assignment.)
 		let labelTok = undefined;
 		if (this.lex.tokens[this.pos]?.type === TokenType.Name) {
 			const secondTok = this.lex.tokens[this.pos+1];
 			if (secondTok?.type !== TokenType.Operator ||
-					secondTok?.normText !== '(') {
+					(secondTok?.normText !== '(' && secondTok?.normText !== '=')) {
 				labelTok = this.expectLabel();
 			}
 		}
@@ -549,22 +560,22 @@ export class Parser {
 			}
 
 		} else {
+			// (none)
 			// {expr}
-			// {expr} ',' [xyz]
-			if (!this.expectExpression(0)) {
-				this.addDiagnosticForToken(
-					'Invalid address expression for opcode',
-					DiagnosticSeverity.Error, firstTok);
-			} else {
-				if (this.expectTokenWithText(TokenType.Operator, ',')) {
-					const xyOp = this.expectToken(TokenType.Name);
-					if (!xyOp ||
-							(xyOp.normText?.toLowerCase() !== 'x' &&
-							xyOp.normText?.toLowerCase() !== 'y' &&
-							xyOp.normText?.toLowerCase() !== 'z')) {
-						this.addDiagnosticForToken(
-							'Invalid index register',
-							DiagnosticSeverity.Error, firstTok);
+			// {expr} ',' {expr}
+			//    (This covers {expr} ',' [xyz] as well as bbr-style {expr} ',' {expr}.)
+			if (!this.isDone()) {
+				if (!this.expectExpression(0)) {
+					this.addDiagnosticForToken(
+						'Invalid address expression for opcode',
+						DiagnosticSeverity.Error, firstTok);
+				} else {
+					if (this.expectTokenWithText(TokenType.Operator, ',')) {
+						if (!this.expectExpression(0)) {
+							this.addDiagnosticForToken(
+								'Invalid index register or relative label',
+								DiagnosticSeverity.Error, firstTok);
+						}
 					}
 				}
 			}
@@ -583,9 +594,9 @@ export function parseLine(text: string, lineNumber: number): ParserResult {
 		.parseIfDefDirective()
 		.handleUnrecognizedHashDirective()
 		.parseMacroDefinitionStart()
-		.parseAssignment()
 		// Always before any line type that can start with a label:
 		.parseLabel()
+		.parseAssignment()
 		.parseMacroUse()
 		.parsePseudoOp()
 		.parseOpcode();

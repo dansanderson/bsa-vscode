@@ -17,7 +17,7 @@ import {
 } from 'vscode-languageserver-textdocument';
 
 import {
-	ParseResults,
+	ParserResult,
 	parseBsa
 } from './bsa_parse';
 
@@ -29,7 +29,7 @@ let hasConfigurationCapability = false;
 let hasWorkspaceFolderCapability = false;
 let hasDiagnosticRelatedInformationCapability = false;
 
-const documentParseResults: Map<string, ParseResults> = new Map();
+const documentParseResults: Map<string, ParserResult> = new Map();
 
 connection.onInitialize((params: InitializeParams) => {
 
@@ -85,7 +85,7 @@ documents.onDidChangeContent(change => {
 });
 
 async function validateTextDocument(textDocument: TextDocument): Promise<void> {
-	const parseResults: ParseResults = parseBsa(textDocument.getText());
+	const parseResults: ParserResult = parseBsa(textDocument.getText());
 
 	documentParseResults.set(textDocument.uri, parseResults);
 

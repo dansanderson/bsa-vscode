@@ -22,13 +22,6 @@ const keywords = [
 	'.pag', '.nam', '.subttl', '.end', '.case', '!src', '!addr'
 ];
 
-const keywordPatterns: Array<KeywordPattern> = keywords.map((kw) => {
-	return {
-		keyword: kw,
-		pat: RegExp(escapeForRegExp(kw) + '\\b', 'iy')
-	};
-});
-
 const opcodes = [
 	'adc', 'adcq', 'and', 'andq', 'asl', 'aslq', 'asr', 'asrq', 'asw',
 	'bbr0', 'bbr1', 'bbr2', 'bbr3', 'bbr4', 'bbr5', 'bbr6', 'bbr7',
@@ -76,18 +69,6 @@ const operators = [
 	'*', '/', '!', '~', '&', '|', '^', ',', '#', '='
 ];
 
-const operatorPatterns: Array<KeywordPattern> = operators.map((kw) => {
-	return {
-		keyword: kw,
-		pat: RegExp(escapeForRegExp(kw), 'y')
-	};
-});
-
-const spacePattern = /\s*/y;
-const namePattern = /(\*|&|(\p{Letter}[\w.]*)|(\d+\$))/uy;
-const starCommentPatterm = /\s*\*\s*(?!=)/y;
-const numberPattern = /((\$[0-9a-f]+)|(%[01]+)|([0-9]+\.[0-9]*)|(\.[0-9]+)|([0-9]+))/iy;
-
 export enum TokenType {
 	LiteralString,
 	LiteralNumber,
@@ -117,9 +98,33 @@ export class Lexer {
 	public tokens: Array<Token> = [];
 	public diagnostics: Array<Diagnostic> = [];
 
+	// These Regexps use "sticky" mode and have state, so they need to be recompiled per Lexer instance.
+	private spacePattern = /\s*/y;
+	private namePattern = /(\*|&|(\p{Letter}[\w.]*)|(\d+\$))/uy;
+	private starCommentPattern = /\s*\*(?!\s*=).*/y;
+	private numberPattern = /((\$[0-9a-f]+)|(%[01]+)|([0-9]+\.[0-9]*)|(\.[0-9]+)|([0-9]+))/iy;
+	private operatorPatterns: Array<KeywordPattern>;
+	private keywordPatterns: Array<KeywordPattern>;
+
 	constructor(
-		public text: string,
-		public lineNumber: number) {}
+			public text: string,
+			public lineNumber: number) {
+
+		this.operatorPatterns = operators.map((kw) => {
+			return {
+				keyword: kw,
+				pat: RegExp(escapeForRegExp(kw), 'y')
+			};
+		});
+
+		this.keywordPatterns = keywords.map((kw) => {
+			return {
+				keyword: kw,
+				pat: RegExp(escapeForRegExp(kw) + '\\b', 'iy')
+			};
+		});
+
+	}
 
 	match(pat: RegExp) {
 		assert (pat.flags.includes('y'));
@@ -133,7 +138,7 @@ export class Lexer {
 
 	startLex() {
 		this.start = this.end;
-		if (this.match(spacePattern)) this.start = this.end;
+		if (this.match(this.spacePattern)) this.start = this.end;
 		return this;
 	}
 
@@ -176,7 +181,7 @@ export class Lexer {
 
 	lexStarComment(): Lexer {
 		// Entire line matches star comment
-		if (starCommentPatterm.test(this.text))
+		if (this.starCommentPattern.test(this.text))
 			this.end = this.text.length;
 		return this;
 	}
@@ -194,6 +199,7 @@ export class Lexer {
 		// BSA string literals cannot span lines, so this terminates an
 		// unterminated literal at the end of the line with a warning.
 		const firstChar = this.text.charAt(this.start);
+		const stringChars = [];
 		if (firstChar == "'" || firstChar == '"') {
 			let sawEndQuote = false;
 			this.end++;
@@ -204,13 +210,14 @@ export class Lexer {
 					break;
 				}
 				if (this.text.charAt(this.end) == '\\') this.end++;
+				stringChars.push(this.text.charAt(this.end));
 				this.end++;
 			}
 			if (!sawEndQuote) {
 				this.addWarning('Unterminated string literal goes to end of line');
 			}
 
-			this.addToken(TokenType.LiteralString);
+			this.addToken(TokenType.LiteralString, stringChars.join(''));
 		}
 
 		return this;
@@ -218,7 +225,7 @@ export class Lexer {
 
 	lexKeyword(): Lexer {
 		if (!this.isActive()) return this;
-		for (const keywordPat of keywordPatterns) {
+		for (const keywordPat of this.keywordPatterns) {
 			if (this.match(keywordPat.pat)) {
 				this.addToken(TokenType.Keyword, keywordPat.keyword);
 
@@ -238,7 +245,7 @@ export class Lexer {
 
 	lexOperator(): Lexer {
 		if (!this.isActive()) return this;
-		for (const operatorPat of operatorPatterns) {
+		for (const operatorPat of this.operatorPatterns) {
 			if (this.match(operatorPat.pat)) {
 				this.addToken(TokenType.Operator, operatorPat.keyword);
 				break;
@@ -260,7 +267,7 @@ export class Lexer {
 
 	lexName(): Lexer {
 		if (!this.isActive()) return this;
-		if (this.match(namePattern)) {
+		if (this.match(this.namePattern)) {
 			this.addToken(TokenType.Name, this.text.substring(this.start, this.end));
 		}
 		return this;
@@ -268,7 +275,7 @@ export class Lexer {
 
 	lexNumber(): Lexer {
 		if (!this.isActive()) return this;
-		if (this.match(numberPattern)) {
+		if (this.match(this.numberPattern)) {
 			this.addToken(TokenType.LiteralNumber);
 		}
 		return this;
