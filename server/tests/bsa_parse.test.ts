@@ -311,7 +311,56 @@ describe('parseSoloTokens', () => {
 	});
 });
 
-// TODO: describe('parseIfDirective', () => {});
+describe('parseIfDirective', () => {
+	test('does nothing if not present', () => {
+		const par = new Parser('sym: lda #$ff', 7);
+		par.startParse().parseIfDirective();
+		expect(par.isDone()).toBe(false);
+		expect(par.diagnostics.length).toBe(0);
+		expect(par.pos).toBe(0);
+	});
+
+	test('succeeds on valid statement', () => {
+		const par = new Parser('#if sym', 7);
+		par.startParse().parseIfDirective();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics.length).toBe(0);
+		expect(par.symbolUses.get('sym')?.length).toBe(1);
+		expect(par.symbolUses.get('sym')?.[0].normText).toEqual('sym');
+		expect(par.symbolUses.get('sym')?.[0].lineNumber).toEqual(7);
+		expect(par.symbolUses.get('sym')?.[0].start).toEqual(4);
+	});
+
+	test('succeeds on valid statement with complex expression', () => {
+		const par = new Parser('#if >(sym + $c000 << 4) - %0100', 7);
+		par.startParse().parseIfDirective();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics.length).toBe(0);
+	});
+
+	test('errors if missing symbol', () => {
+		const par = new Parser('#if', 7);
+		par.startParse().parseIfDirective();
+		expect(par.diagnostics.length).toBe(1);
+		expect(par.diagnostics[0].message.includes('Missing or invalid expression')).toBe(true);
+	});
+
+	test('errors if token before keyword', () => {
+		const par = new Parser('sym #if', 7);
+		par.startParse().parseIfDirective();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics.length).toBe(1);
+		expect(par.diagnostics[0].message.includes('before')).toBe(true);
+	});
+
+	test('errors if token after #if statement', () => {
+		const par = new Parser('#if sym foo', 7);
+		par.startParse().parseIfDirective();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics.length).toBe(1);
+		expect(par.diagnostics[0].message.includes('after')).toBe(true);
+	});
+});
 
 describe('parseIfDefDirective', () => {
 	test('does nothing if not present', () => {
@@ -347,6 +396,14 @@ describe('parseIfDefDirective', () => {
 		expect(par.isDone()).toBe(true);
 		expect(par.diagnostics.length).toBe(1);
 		expect(par.diagnostics[0].message.includes('before')).toBe(true);
+	});
+
+	test('errors if text after #ifdef statement', () => {
+		const par = new Parser('#ifdef sym foo', 7);
+		par.startParse().parseIfDefDirective();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics.length).toBe(1);
+		expect(par.diagnostics[0].message.includes('after')).toBe(true);
 	});
 });
 

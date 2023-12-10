@@ -178,12 +178,7 @@ export class Parser {
 
 		} else {
 			if (this.lex.tokens[this.pos].type === TokenType.Name) {
-				const name = this.lex.tokens[this.pos].normText || '';
-				if (!this.symbolUses.has(name)) {
-					this.symbolUses.set(name, [this.lex.tokens[this.pos]]);
-				} else {
-					this.symbolUses.get(name)?.push(this.lex.tokens[this.pos]);
-				}
+				this.addUse(this.symbolUses, this.lex.tokens[this.pos]);
 			}
 			this.pos++;
 		}
@@ -242,7 +237,39 @@ export class Parser {
 		return this;
 	}
 
-	// TODO: parseIfDirective()  #if {expr}
+	parseIfDirective() {
+		if (this.isDone()) return this;
+
+		// #if {expr}
+		if (this.pos === 0 && !!this.expectTokenWithText(TokenType.Keyword, '#if')) {
+			if (!this.expectExpression(0)) {
+				this.addDiagnosticForToken(
+					'Missing or invalid expression for #if',
+					DiagnosticSeverity.Error, this.lex.tokens[0]);
+			} else if (this.pos < this.lex.tokens.length && this.lex.tokens[this.pos].type !== TokenType.RestOfLine) {
+				this.addDiagnosticForToken(
+					'Unexpected text after #if',
+					DiagnosticSeverity.Error, this.lex.tokens[0]);
+			}
+			this.pos = this.lex.tokens.length;
+		} else if (this.lex.tokens.length > 1) {
+			let foundErrant = false;
+			const prevPos = this.pos;
+			for (this.pos = 1; this.pos < this.lex.tokens.length; this.pos++) {
+				if (this.expectTokenWithText(TokenType.Keyword, '#if')) {
+					foundErrant = true;
+					this.addDiagnosticForToken(
+						'Unexpected text before #if',
+						DiagnosticSeverity.Error, this.lex.tokens[this.pos - 1]);
+					// (length - 1 because for() increments one more time)
+					this.pos = this.lex.tokens.length - 1;
+				}
+			}
+			if (!foundErrant) this.pos = prevPos;
+		}
+
+		return this;
+	}
 
 	parseIfDefDirective() {
 		if (this.isDone()) return this;
@@ -252,6 +279,11 @@ export class Parser {
 			const nameTok = this.expectToken(TokenType.Name);
 			if (nameTok) {
 				this.addUse(this.symbolUses, nameTok);
+				if (this.pos < this.lex.tokens.length && this.lex.tokens[this.pos].type !== TokenType.RestOfLine) {
+					this.addDiagnosticForToken(
+						'Unexpected text after #ifdef',
+						DiagnosticSeverity.Error, this.lex.tokens[0]);
+				}
 			} else {
 				this.addDiagnosticForToken(
 					'Missing symbol for #ifdef',
@@ -342,8 +374,6 @@ export class Parser {
 	// - [{sym}:?]
 	//   - record label; ignore local labels (\d+\$)
 	//
-	// - expr parsing
-	//   - record symbol use
 	// - addressing mode parsing
 	//   '#' {expr}
 	//   {expr}
