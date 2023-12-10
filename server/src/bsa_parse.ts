@@ -177,6 +177,14 @@ export class Parser {
 			return false;
 
 		} else {
+			if (this.lex.tokens[this.pos].type === TokenType.Name) {
+				const name = this.lex.tokens[this.pos].normText || '';
+				if (!this.symbolUses.has(name)) {
+					this.symbolUses.set(name, [this.lex.tokens[this.pos]]);
+				} else {
+					this.symbolUses.get(name)?.push(this.lex.tokens[this.pos]);
+				}
+			}
 			this.pos++;
 		}
 

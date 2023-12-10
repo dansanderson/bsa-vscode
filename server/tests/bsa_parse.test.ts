@@ -145,6 +145,7 @@ describe('expectExpression', () => {
 		expect(par.startParse().expectExpression()).toBe(true);
 		expect(par.diagnostics.length).toBe(0);
 		expect(par.isDone()).toBe(true);
+		expect(par.symbolUses.get('abc')?.[0]).toBeDefined();
 	});
 
 	test('star symbol ok', () => {
@@ -178,6 +179,7 @@ describe('expectExpression', () => {
 		expect(par.startParse().expectExpression()).toBe(true);
 		expect(par.diagnostics.length).toBe(0);
 		expect(par.isDone()).toBe(true);
+		expect(par.symbolUses.get('abc')?.[0]).toBeDefined();
 	});
 
 	test('one symbol in square brackets ok', () => {
@@ -185,6 +187,7 @@ describe('expectExpression', () => {
 		expect(par.startParse().expectExpression()).toBe(true);
 		expect(par.diagnostics.length).toBe(0);
 		expect(par.isDone()).toBe(true);
+		expect(par.symbolUses.get('abc')?.[0]).toBeDefined();
 	});
 
 	test('error wrong closing bracket', () => {
@@ -198,6 +201,7 @@ describe('expectExpression', () => {
 		expect(par.startParse().expectExpression()).toBe(true);
 		expect(par.diagnostics.length).toBe(0);
 		expect(par.isDone()).toBe(true);
+		expect(par.symbolUses.get('abc')?.[0]).toBeDefined();
 	});
 
 	test('unary operator with paren expression ok', () => {
@@ -205,6 +209,7 @@ describe('expectExpression', () => {
 		expect(par.startParse().expectExpression()).toBe(true);
 		expect(par.diagnostics.length).toBe(0);
 		expect(par.isDone()).toBe(true);
+		expect(par.symbolUses.get('abc')?.[0]).toBeDefined();
 	});
 
 	test('starts with non-unary operator error', () => {
@@ -239,6 +244,8 @@ describe('expectExpression', () => {
 		expect(par.startParse().expectExpression()).toBe(true);
 		expect(par.diagnostics.length).toBe(0);
 		expect(par.isDone()).toBe(true);
+		expect(par.symbolUses.get('sym')?.[0]).toBeDefined();
+		expect(par.symbolUses.get('sym2')?.[0]).toBeDefined();
 	});
 
 	test('complex expression missing last term error', () => {
