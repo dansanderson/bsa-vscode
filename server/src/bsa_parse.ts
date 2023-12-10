@@ -117,6 +117,19 @@ export class Parser {
 		return undefined;
 	}
 
+	isLocalLabel(tok: Token) {
+		return (tok.type === TokenType.Name &&
+			!!(tok.normText || '').match(/^\d+\$$/));
+	}
+
+	expectLabel() {
+		const tok = this.expectToken(TokenType.Name);
+		if (!tok) return undefined;
+		this.expectTokenWithText(TokenType.Operator, ':');
+		if (!this.isLocalLabel(tok)) this.symbolDefinitions.push(tok);
+		return tok;
+	}
+
 	expectExpression(priority: number = 0): boolean {
 		if (this.isDone()) return false;
 
@@ -177,7 +190,8 @@ export class Parser {
 			return false;
 
 		} else {
-			if (this.lex.tokens[this.pos].type === TokenType.Name) {
+			if (this.lex.tokens[this.pos].type === TokenType.Name &&
+					!this.isLocalLabel(this.lex.tokens[this.pos])) {
 				this.addUse(this.symbolUses, this.lex.tokens[this.pos]);
 			}
 			this.pos++;
@@ -278,7 +292,8 @@ export class Parser {
 		if (this.pos === 0 && !!this.expectTokenWithText(TokenType.Keyword, '#ifdef')) {
 			const nameTok = this.expectToken(TokenType.Name);
 			if (nameTok) {
-				this.addUse(this.symbolUses, nameTok);
+				if (!this.isLocalLabel(nameTok))
+					this.addUse(this.symbolUses, nameTok);
 				if (this.pos < this.lex.tokens.length && this.lex.tokens[this.pos].type !== TokenType.RestOfLine) {
 					this.addDiagnosticForToken(
 						'Unexpected text after #ifdef',
@@ -362,6 +377,40 @@ export class Parser {
 		return this;
 	}
 
+	parseAssignment() {
+		if (this.isDone()) return this;
+
+		const startPos = this.pos;
+		const nameTok = (this.expectToken(TokenType.Name) ||
+			this.expectTokenWithText(TokenType.Operator, '&'));
+		if (!nameTok) return this;
+		if (!this.expectTokenWithText(TokenType.Operator, '=')) {
+			this.pos = startPos;
+			return this;
+		}
+		if (!this.expectExpression(0)) {
+			this.addDiagnosticForToken(
+				'Invalid assignment expression',
+				DiagnosticSeverity.Error, this.lex.tokens[this.pos-1]);
+		} else {
+			if (nameTok.normText !== '*' && nameTok.normText !== '&')
+				this.symbolDefinitions.push(nameTok);
+		}
+		this.pos = this.lex.tokens.length;
+
+		return this;
+	}
+
+	parseLabel() {
+		this.expectLabel();
+		return this;
+	}
+
+	parseMacroUse() {
+		// TODO:
+		return this;
+	}
+
 	// TODO:
 	// - Assignment
 	//    * = {expr}
@@ -389,10 +438,14 @@ export function parseLine(text: string, lineNumber: number): ParserResult {
 	const par = new Parser(text, lineNumber)
 		.startParse()
 		.parseSoloTokens()
-		// TODO: .parseIfDirective()
+		.parseIfDirective()
 		.parseIfDefDirective()
 		.handleUnrecognizedHashDirective()
-		.parseMacroDefinitionStart();
+		.parseMacroDefinitionStart()
+		.parseAssignment()
+		// Always before other lines that can start with a label:
+		.parseLabel()
+		.parseMacroUse();
 	if (!par.isDone()) {
 		par.addDiagnosticForTokenRange(
 			'Syntax error', DiagnosticSeverity.Error,

@@ -523,4 +523,9 @@ describe('lexLine', () => {
 		expect(results.tokens[1].type).toBe(TokenType.Name);
 	});
 
+	test('local line number lexes as name', () => {
+		const results = lexLine('10$', 7);
+		expect(results.tokens.length).toBe(1);
+		expect(results.tokens[0].type).toBe(TokenType.Name);
+	});
 });

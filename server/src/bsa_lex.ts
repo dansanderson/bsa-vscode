@@ -285,9 +285,9 @@ export function lexLine(text: string, lineNumber: number): LexerResult {
 			.lexStringLiteral()
 			.lexOpcode()
 			.lexKeyword()
-			.lexNumber()
 			.lexOperator()
-			.lexName();
+			.lexName()
+			.lexNumber();
 		if (results.isActive()) {
 			results.addError('Syntax error');
 			break;

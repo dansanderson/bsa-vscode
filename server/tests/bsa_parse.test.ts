@@ -126,6 +126,38 @@ describe('expectToken', () => {
 	});
 });
 
+describe('expectLabel', () => {
+	test('empty does nothing', () => {
+		const par = new Parser('', 7);
+		expect(par.startParse().expectLabel()).toBeUndefined();
+		expect(par.isDone()).toBe(true);
+	});
+
+	test('label records symbol definition', () => {
+		const par = new Parser('foo lda #7', 7);
+		const result = par.startParse().expectLabel();
+		expect(result).toBeDefined();
+		expect(par.pos).toBe(1);
+		expect(par.symbolDefinitions[0].normText).toBe('foo');
+	});
+
+	test('label skips colon', () => {
+		const par = new Parser('foo: lda #7', 7);
+		const result = par.startParse().expectLabel();
+		expect(result).toBeDefined();
+		expect(par.pos).toBe(2);
+		expect(par.symbolDefinitions[0].normText).toBe('foo');
+	});
+
+	test('local label does not record symbol definition', () => {
+		const par = new Parser('10$ lda #7', 7);
+		const result = par.startParse().expectLabel();
+		expect(result).toBeDefined();
+		expect(par.pos).toBe(1);
+		expect(par.symbolDefinitions.length).toBe(0);
+	});
+});
+
 describe('expectExpression', () => {
 	test('false when done', () => {
 		const par = new Parser('  ; line comment', 7);
@@ -499,6 +531,43 @@ describe('parseMacroDefinitionStart', () => {
 	});
 });
 
+describe('parseAssignment', () => {
+	test('assign to name', () => {
+		const par = new Parser('foo = $b4', 7);
+		par.startParse().parseAssignment();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics.length).toBe(0);
+		expect(par.symbolDefinitions[0].normText).toEqual('foo');
+	});
+
+	test('assign to star', () => {
+		const par = new Parser('* = $c000', 7);
+		par.startParse().parseAssignment();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics.length).toBe(0);
+		expect(par.symbolDefinitions.length).toBe(0);
+	});
+
+	test('assign to ampersand', () => {
+		const par = new Parser('& = $c000', 7);
+		par.startParse().parseAssignment();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics.length).toBe(0);
+		expect(par.symbolDefinitions.length).toBe(0);
+	});
+
+	test('missing expression error', () => {
+		const par = new Parser('foo =', 7);
+		par.startParse().parseAssignment();
+		expect(par.isDone()).toBe(true);
+		expect(par.diagnostics.length).toBe(1);
+		expect(par.symbolDefinitions.length).toBe(0);
+		expect(par.diagnostics[0].message).toContain('Invalid assignment');
+	});
+});
+
+// TODO: parseMacroUse
+
 describe('parseLine: empty and comments', () => {
 	test('empty string returns empty results', () => {
 		const par = parseLine('', 0);
@@ -514,6 +583,25 @@ describe('parseLine: empty and comments', () => {
 		const par = parseLine('   ; line comment', 0);
 		expect(par.diagnostics.length).toBe(0);
 	});
+
+	test('line with label only records label definition', () => {
+		const par = parseLine('foo', 0);
+		expect(par.diagnostics.length).toBe(0);
+		expect(par.symbolDefinitions[0].normText).toBe('foo');
+	});
+
+	test('line with label and colon only', () => {
+		const par = parseLine('foo:', 0);
+		expect(par.diagnostics.length).toBe(0);
+		expect(par.symbolDefinitions[0].normText).toBe('foo');
+	});
+
+	test('line with label only and comment', () => {
+		const par = parseLine('foo   ; some comment', 0);
+		expect(par.diagnostics.length).toBe(0);
+		expect(par.symbolDefinitions[0].normText).toBe('foo');
+	});
+
 });
 
 describe('parseBsa', () => {
