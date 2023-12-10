@@ -22,7 +22,22 @@ Intended features:
 
 ## Installing the extension
 
-TODO
+First, download the `.vsix` package of a release of this extension. Then install it:
+
+1. Go to the Extensions view.
+2. Click the **...** dropdown menu.
+3. Select **Install from VSIX...**. Follow the prompts to select the `.vsix` file.
+
+Now you can select the "BSA" file type, either manually for a file or associated with a filename extension. To make this project-specific, edit `.vscode/settings.json` and add a section like this:
+
+```json
+	"files.associations": {
+		"*.src": "bsa",
+		"*.asm": "bsa"
+	}
+```
+
+To build the `.vsix` package from source, make sure you have run `npm install`, then: `npm run package`
 
 ## Customizing syntax coloring
 
