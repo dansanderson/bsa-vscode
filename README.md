@@ -1,7 +1,7 @@
 # BSA 6502 / 45GS02 assembler extension for VS Code
 
 This is a VS Code extension for the [BSA
-assembler](https://github.com/Edilbert/BSA). The extension is primarily
+assembler](https://github.com/MEGA65/BSA). The extension is primarily
 intended for use by the [MEGA65](https://mega65.org/) project.
 
 ## Features
@@ -10,15 +10,15 @@ Implemented features:
 
 * Syntax highlighting
 * Highlight errors and warnings
-* Find all references
-* Go to definition
-* List document symbols
 
 Intended features:
 
+* Find all references
+* Go to definition
+* List document symbols
 * Parsing of pseudo-op arguments
 * Different syntax coloring for branch instructions
-* Validate addressing modes per instruction (i.e. only allow CPU-valid opcode + addressing mode combinations)
+* Validate addressing modes per instruction, i.e. only allow CPU-valid opcode + addressing mode combinations
 
 ## Installing the extension
 
@@ -77,8 +77,8 @@ This extension, including the language server, is written entirely in TypeScript
 To start a debugging session:
 
 1. Open the root folder in VS Code.
-2. Press Ctrl + Shift + B (Cmd + Shift + B on Mac) to start compiling the client and server in watch mode.
-3. Select the Run and Debug view from the side panel (or press Ctrl + Shift + D, Cmd + Shift + D on Mac).
+2. Press **Ctrl + Shift + B** (**Cmd + Shift + B** on Mac) to start compiling the client and server in watch mode.
+3. Select the Run and Debug view from the side panel (or press **Ctrl + Shift + D**, **Cmd + Shift + D** on Mac).
 4. Select the "Client + Server" compound debugging configuration from the dropdown menu, then press F5 to launch it. The main window starts debugging mode with a debugging toolbar shown, and another window opens running the extension.
 5. In the main window's debugging toolbar, switch between "Launch Client" and "Activate Server" to debug the client or server, respectively. This switches the Debug Console, and allows for setting breakpoints on the respective TypeScript code files.
 
@@ -103,10 +103,6 @@ describe('parseBsa', () => {
 
 To run language server unit tests: `cd server; npm run test`
 
-## Known Issues
-
-This extension is a work in progress and is not yet released.
-
 ## Release Notes
 
-* 0.0.0: Not yet released.
+* 0.0.1: Initial release.
