@@ -16,7 +16,6 @@ Implemented features:
 
 Not yet implemented:
 
-* Different syntax coloring for branch instructions
 * Parsing of pseudo-op arguments
 * Validate addressing modes per instruction, i.e. only allow CPU-valid opcode + addressing mode combinations
 

@@ -13,6 +13,7 @@
 		{"include": "#pseudoops"},
 		{"include": "#directives"},
 		{"include": "#other-keywords"},
+		{"include": "#branch-opcodes"},
 		{"include": "#opcodes"},
 		{"include": "#addressing-mode-immediate"},
 		{"include": "#addressing-mode"},
@@ -64,6 +65,10 @@
 		"operators": {
 			"name": "keyword.operator.bsa",
 			"match": "(==|!=|>=|<=|<<|>>|&&|\\|\\||=|\\^|<|>|-|!|~|\\+|\\*|/|&|\\||\\(|\\)|\\[|\\])"
+		},
+		"branch-opcodes": {
+			"name": "keyword.control.opcode.bsa",
+			"match": "(?i)(?<!\\w)(BBR0|BBR1|BBR2|BBR3|BBR4|BBR5|BBR6|BBR7|BBR|BBS0|BBS1|BBS2|BBS3|BBS4|BBS5|BBS6|BBS7|BBS|BCC|BCS|BEQ|BMI|BNE|BPL|BRA|BRU|BSR|BVC|BVS|JMP|JSR|RTI|RTS)(?!\\w)"
 		},
 		"opcodes": {
 			"name": "keyword.other.opcode.bsa",

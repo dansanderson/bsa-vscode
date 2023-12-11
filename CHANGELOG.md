@@ -8,6 +8,7 @@ Changes in each release of the BSA VSCode extension:
 - View references (within a single document)
 - List symbols in document
 - Highlight references in document
+- Use distinct syntax highlight category for control flow instructions
 
 ## v0.0.1
 
