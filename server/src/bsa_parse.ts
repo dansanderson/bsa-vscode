@@ -116,9 +116,19 @@ export class Parser {
 		addToMapOfList(this.symbolUsesByLine, tok.lineNumber, tok);
 	}
 
+	addSymbolDefinition(tok: Token) {
+		this.symbolDefinitions.push(tok);
+		this.addSymbolUse(tok);
+	}
+
 	addMacroUse(tok: Token) {
 		addToMapOfList(this.macroUses, tok.normText, tok);
 		addToMapOfList(this.macroUsesByLine, tok.lineNumber, tok);
+	}
+
+	addMacroDefinition(tok: Token) {
+		this.macroDefinitions.push(tok);
+		this.addMacroUse(tok);
 	}
 
 	startParse() {
@@ -156,7 +166,7 @@ export class Parser {
 		const tok = this.expectToken(TokenType.Name);
 		if (!tok) return undefined;
 		this.expectTokenWithText(TokenType.Operator, ':');
-		if (!this.isLocalLabel(tok)) this.symbolDefinitions.push(tok);
+		if (!this.isLocalLabel(tok)) this.addSymbolDefinition(tok);
 		return tok;
 	}
 
@@ -402,7 +412,7 @@ export class Parser {
 							'Unexpected text after macro definition start',
 							DiagnosticSeverity.Error, this.lex.tokens[this.pos]);
 					} else {
-						this.macroDefinitions.push(nameTok);
+						this.addMacroDefinition(nameTok);
 					}
 				}
 			} else {
@@ -434,7 +444,7 @@ export class Parser {
 				DiagnosticSeverity.Error, this.lex.tokens[this.pos-1]);
 		} else {
 			if (nameTok.normText !== '*' && nameTok.normText !== '&')
-				this.symbolDefinitions.push(nameTok);
+				this.addSymbolDefinition(nameTok);
 		}
 		this.pos = this.lex.tokens.length;
 

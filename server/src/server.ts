@@ -55,9 +55,9 @@ connection.onInitialize((params: InitializeParams) => {
 		capabilities: {
 			textDocumentSync: TextDocumentSyncKind.Incremental,
 			definitionProvider: true,
-			// referencesProvider: true,
-			// documentSymbolProvider: true,
-			// documentHighlightProvider: true,
+			referencesProvider: true,
+			documentSymbolProvider: true,
+			documentHighlightProvider: true,
 		}
 	};
 	if (hasWorkspaceFolderCapability) {
@@ -97,14 +97,22 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 	});
 }
 
-function findDefinitionForUse(
+function findUseTokenByPosition(
 		usesByLine: Map<number, Array<Token>>,
 		definitions: Token[],
 		lineNumber: number,
 		charPos: number): Token | undefined {
 	const usesForLine = usesByLine.get(lineNumber);
 	if (!usesForLine) return undefined;
-	const useToken = usesForLine.find(useToken => charPos >= useToken.start && charPos <= useToken.end);
+	return usesForLine.find(useToken => charPos >= useToken.start && charPos <= useToken.end);
+}
+
+function findDefinitionForUse(
+		usesByLine: Map<number, Array<Token>>,
+		definitions: Token[],
+		lineNumber: number,
+		charPos: number): Token | undefined {
+	const useToken = findUseTokenByPosition(usesByLine, definitions, lineNumber, charPos);
 	if (!useToken) return undefined;
 	return definitions.find(defToken => defToken.normText === useToken.normText);
 }
@@ -137,58 +145,94 @@ connection.onDefinition((request: DefinitionParams) => {
 	return null;
 });
 
-// TODO: Find All References
-connection.onReferences((request: ReferenceParams) => {
-	// request.textDocument.uri
-	// request.position.character
-	// request.position.line
-	// request.context.includeDeclaration
+function findReferencesForUse(
+		usesByName: Map<string, Array<Token>>,
+		usesByLine: Map<number, Array<Token>>,
+		definitions: Token[],
+		lineNumber: number,
+		charPos: number): Array<Token> {
+	const useToken = findUseTokenByPosition(usesByLine, definitions, lineNumber, charPos);
+	if (!useToken || !useToken.normText) return [];
+	return usesByName.get(useToken.normText || '') || [];
+}
 
-	// return null;
-	return [
-		{
+connection.onReferences((request: ReferenceParams) => {
+	// (BSA references only apply to the current file.)
+	const parseResult = documentParseResults.get(request.textDocument.uri);
+	if (!parseResult) return null;
+
+	const references: Array<Token> = (
+		findReferencesForUse(
+			parseResult.symbolUses,
+			parseResult.symbolUsesByLine,
+			parseResult.symbolDefinitions,
+			request.position.line,
+			request.position.character) ||
+		findReferencesForUse(
+			parseResult.macroUses,
+			parseResult.macroUsesByLine,
+			parseResult.macroDefinitions,
+			request.position.line,
+			request.position.character));
+
+	// TODO: request.context.includeDeclaration
+
+	return references.map(tok => {
+		return {
 			uri: request.textDocument.uri,
 			range: {
-				start: { line: 0, character: 0 },
-				end: { line: 0, character: 1 }
+				start: { line: tok.lineNumber, character: tok.start },
+				end: { line: tok.lineNumber, character: tok.end }
 			}
-		}
-	];
+		};
+	});
 });
 
-// TODO: List Document Symbols
 connection.onDocumentSymbol((request: DocumentSymbolParams) => {
-	// request.textDocument.uri
-	return [
-		{
-			name: 'symName',
+	const parseResult = documentParseResults.get(request.textDocument.uri);
+	if (!parseResult) return null;
+
+	return parseResult.symbolDefinitions.concat(parseResult.macroDefinitions).map(defToken => {
+		return {
+			name: defToken.normText || '',
 			kind: SymbolKind.Variable,
-			range: {
-				start: { line: 0, character: 0 },
-				end: { line: 0, character: 1 }
-			},
-			selectionRange: {
-				start: { line: 0, character: 0 },
-				end: { line: 0, character: 1 }
+			location: {
+				uri: request.textDocument.uri,
+				range: {
+					start: { line: defToken.lineNumber, character: defToken.start },
+					end: { line: defToken.lineNumber, character: defToken.end }
+				}
 			}
-		}
-	];
+		};
+	});
 });
 
-// TODO: Highlight All Occurrences
 connection.onDocumentHighlight((request: DocumentHighlightParams) => {
-	// request.textDocument.uri
-	// request.position.character
-	// request.position.line
+	const parseResult = documentParseResults.get(request.textDocument.uri);
+	if (!parseResult) return null;
 
-	return [
-		{
+	const references: Array<Token> = (
+		findReferencesForUse(
+			parseResult.symbolUses,
+			parseResult.symbolUsesByLine,
+			parseResult.symbolDefinitions,
+			request.position.line,
+			request.position.character) ||
+		findReferencesForUse(
+			parseResult.macroUses,
+			parseResult.macroUsesByLine,
+			parseResult.macroDefinitions,
+			request.position.line,
+			request.position.character));
+
+	return references.map(tok => {
+		return {
 			range: {
-				start: { line: 0, character: 0 },
-				end: { line: 0, character: 1 }
+				start: { line: tok.lineNumber, character: tok.start },
+				end: { line: tok.lineNumber, character: tok.end }
 			}
-		}
-	];
+		};
+	});
 });
 
 documents.listen(connection);

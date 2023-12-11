@@ -1,9 +1,16 @@
 # Change Log
 
-All notable changes to the "bsa" extension will be documented in this file.
+Changes in each release of the BSA VSCode extension:
 
-Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
+## v0.0.2
 
-## [Unreleased]
+- Go to definition
+- View references (within a single document)
+- List symbols in document
+- Highlight references in document
+
+## v0.0.1
 
 - Initial release
+- Syntax coloring
+- Syntax error diagnostics

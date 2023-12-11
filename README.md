@@ -10,14 +10,14 @@ Implemented features:
 
 * Syntax highlighting
 * Highlight errors and warnings
+* List and highlight references to a symbol or macro
+* Go to definition for a symbol or macro
+* List document symbols and macros
 
-Intended features:
+Not yet implemented:
 
-* Find all references
-* Go to definition
-* List document symbols
-* Parsing of pseudo-op arguments
 * Different syntax coloring for branch instructions
+* Parsing of pseudo-op arguments
 * Validate addressing modes per instruction, i.e. only allow CPU-valid opcode + addressing mode combinations
 
 ## Installing the extension
