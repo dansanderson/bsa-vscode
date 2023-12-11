@@ -101,7 +101,3 @@ describe('parseBsa', () => {
 ```
 
 To run language server unit tests: `cd server; npm run test`
-
-## Release Notes
-
-* 0.0.1: Initial release.
