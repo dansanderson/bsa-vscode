@@ -4,6 +4,7 @@
   "version": "0.0.2",
   "description": "Language support for the BSA 6502 / 45GS02 assembler",
   "author": "Dan Sanderson",
+  "publisher": "Dan Sanderson",
   "license": "GPL 3",
   "repository": {
     "type": "git",
